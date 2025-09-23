@@ -1,8 +1,9 @@
-// tailwind.config.ts
-import type { Config } from "tailwindcss";
-
-const config: Config = {
-  content: ["./src/**/*.{ts,tsx}"],
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./src/app/**/*.{js,ts,jsx,tsx}",
+    "./src/components/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
       colors: {
@@ -17,14 +18,11 @@ const config: Config = {
           focuspilot: "#7C3AED",
           shiftrix:   "#F97316",
           linguai:    "#10B981",
-        }
+        },
       },
-      borderRadius: {
-        brand: "1rem"
-      }
+      borderRadius: { brand: "1rem" },
     },
   },
   plugins: [],
 };
-export default config;
 

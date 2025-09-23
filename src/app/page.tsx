@@ -2,42 +2,61 @@ import Link from "next/link";
 
 export default function Page() {
   return (
-    <section className="space-y-10">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl md:text-5xl font-semibold">Wir bauen Tools für Macher.</h1>
-        <p className="text-lg text-softbrew-mid">
+    <section className="space-y-12">
+      {/* Hero */}
+      <div className="text-center space-y-5">
+        <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">
+          Wir bauen Tools für Macher.
+        </h1>
+        <p className="text-lg text-white/70">
           Drei Produkte, ein Ziel: weniger Frust, mehr Ergebnis.
         </p>
-        <div className="flex items-center justify-center gap-3">
-          <a href="https://softbrewstudio.com" className="hidden" aria-hidden="true">noop</a>
-          <a
-            className="inline-block rounded-brand bg-softbrew-blue px-5 py-3 text-white"
-            href="https://linktr.ee/softbrewstudio"
-          >
-            Updates & Beta
-          </a>
-        </div>
+        <a
+          className="inline-block rounded-brand bg-softbrew-blue px-6 py-3 text-white font-medium shadow hover:shadow-lg active:scale-[0.99] transition"
+          href="https://linktr.ee/softbrewstudio"
+        >
+          Updates & Beta
+        </a>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card title="FocusPilot" desc="Dein KI-CoPilot für Projekte & Fokus"
-              color="product.focuspilot" href="/focuspilot" />
-        <Card title="Shiftrix" desc="Smarte Schicht- & Projektplanung"
-              color="product.shiftrix" href="/shiftrix" />
-        <Card title="LinguAI" desc="Sprachen lernen mit echter KI"
-              color="product.linguai" href="/linguai" />
+      {/* Karten */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card
+          title="FocusPilot"
+          desc="Dein KI-CoPilot für Projekte & Fokus"
+          color="#7C3AED"
+          href="/focuspilot"
+        />
+        <Card
+          title="Shiftrix"
+          desc="Smarte Schicht- & Projektplanung"
+          color="#F97316"
+          href="/shiftrix"
+        />
+        <Card
+          title="LinguAI"
+          desc="Sprachen lernen mit echter KI"
+          color="#10B981"
+          href="/linguai"
+        />
       </div>
     </section>
   );
 }
 
-function Card({ title, desc, color, href }:
- { title:string; desc:string; color:string; href:string }) {
+function Card({
+  title, desc, color, href,
+}: { title: string; desc: string; color: string; href: string }) {
   return (
-    <Link href={href} className="block border border-softbrew.gray/60 rounded-brand p-6 hover:shadow-md transition">
-      <div className={`h-2 w-16 rounded-full mb-4 bg-[color:var(--tw-${color})]`} />
+    <Link
+      href={href}
+      className="group block rounded-brand border border-white/10 bg-white/[0.03] p-6
+                 hover:bg-white/[0.05] hover:border-white/20 transition
+                 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+    >
+      <div className="mb-4 h-1.5 w-16 rounded-full" style={{ backgroundColor: color }} />
       <h3 className="text-xl font-semibold mb-1">{title}</h3>
-      <p className="text-softbrew-mid mb-4">{desc}</p>
+      <p className="text-white/70 mb-4">{desc}</p>
       <span className="text-softbrew-blue">Mehr erfahren →</span>
     </Link>
   );

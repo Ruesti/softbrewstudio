@@ -9,7 +9,7 @@ export default function Page() {
       <p>
         Softbrew Studio – Ulrich Wallis<br/>
         {/* Deine Anschrift hier einsetzen */}
-        Musterstraße 1, 12345 Musterstadt, Deutschland<br/>
+        Industriestr.14a, 28857 Syke, Deutschland<br/>
         E-Mail: <a href="mailto:support@softbrewstudio.com">support@softbrewstudio.com</a>
       </p>
 

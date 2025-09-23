@@ -2,10 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-}
-body {
-  @apply bg-white text-softbrew-black;
-}
+/* Dark default */
+:root { color-scheme: dark; }
+body { @apply bg-softbrew-black text-white antialiased; }
+
+/* Links */
+a { @apply text-softbrew-blue; }
+a:hover { @apply opacity-90; }
 

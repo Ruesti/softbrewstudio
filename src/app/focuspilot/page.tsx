@@ -1,27 +1,35 @@
-export const metadata = { title: "FocusPilot – Softbrew Studio" };
+import PageShell from "@/components/PageShell";
+import { Card } from "@/components/Card";
 
-export default function Page() {
+export default function FocusPilotPage() {
   return (
-    <article className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-3xl font-semibold">✨ FocusPilot – Projekt-CoPilot statt Chaos</h1>
-      <p className="text-white/80">
-        FocusPilot speichert automatisch Kontext, To-dos und Fortschritt – damit du jederzeit
-        nahtlos weitermachst. Mit GPT als ruhigem Co-Piloten.
-      </p>
-      <hr className="border-white/10" />
-      <h2 className="text-2xl font-semibold">🚀 Features</h2>
-      <ul className="list-disc pl-6 text-white/80 space-y-1">
-        <li>Automatische Projektnotizen (Developer Notes)</li>
-        <li>GPT-Wiedereinstieg („Was war zuletzt wichtig?“)</li>
-        <li>Aufgaben &amp; Meilensteine ohne Overhead</li>
-      </ul>
-      <hr className="border-white/10" />
-      <h2 className="text-2xl font-semibold">📌 Status</h2>
-      <p className="text-white/80">
-        Coming Soon – Alpha intern. Updates &amp; Beta:&nbsp;
-        <a className="underline" href="https://linktr.ee/softbrewstudio">linktr.ee/softbrewstudio</a>
-      </p>
-    </article>
+    <PageShell title="FocusPilot" subtitle="Produktivität für kreative Köpfe.">
+      {/* Akzent-Section */}
+      <section className="rounded-brand p-6 bg-product-focuspilot text-white">
+        <h2 className="text-xl font-semibold mb-2">Dein smarter Co-Pilot</h2>
+        <p className="opacity-90">
+          Fokus halten, Projekte strukturieren, Fortschritt sichtbar machen.
+        </p>
+
+        {/* Neutrale Cards innen */}
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <Card className="bg-white text-softbrew-black">
+            <Card.Header title="Projekte & Aufgaben" />
+            <Card.Body>Boards, Prioritäten, Deadlines, Zuständigkeiten.</Card.Body>
+          </Card>
+
+          <Card className="bg-white text-softbrew-black">
+            <Card.Header title="KI-Coach" />
+            <Card.Body>Kontext-Tipps, Wiedereinstiegs-Hinweise, sanfte Nudges.</Card.Body>
+          </Card>
+
+          <Card className="bg-white text-softbrew-black md:col-span-2">
+            <Card.Header title="Sync & Cloud" />
+            <Card.Body>Supabase, Multi-Device, sichere Speicherung.</Card.Body>
+          </Card>
+        </div>
+      </section>
+    </PageShell>
   );
 }
 

@@ -8,8 +8,8 @@ export default function Page() {
       <p><strong>Softbrew Studio</strong><br/>
       Ulrich Wallis<br/>
       {/* Deine ladungsfähige Anschrift hier einsetzen */}
-      Musterstraße 1<br/>
-      12345 Musterstadt<br/>
+      Industriestr. 14a<br/>
+      28857 Syke<br/>
       Deutschland</p>
 
       <p>
