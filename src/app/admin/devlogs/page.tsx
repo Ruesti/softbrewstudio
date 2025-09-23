@@ -17,6 +17,15 @@ type DevlogRow = {
   links?: LinkItem[];
 };
 
+type ListResponse = {
+  data: DevlogRow[];
+  error?: string;
+};
+
+type ApiResponse =
+  | { ok: true; data?: unknown }
+  | { ok: false; error: string };
+
 const isUUID = (v: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 
@@ -46,23 +55,38 @@ export default function AdminDevlogsPage() {
     setStatus("Lade Liste…");
     try {
       const url = `/api/devlogs/list?project=${encodeURIComponent(p)}&limit=10`;
-      const res = await fetch(url, { cache: "no-store" });
+      const res: Response = await fetch(url, { cache: "no-store" });
       const text = await res.text();
-      let j: any = null;
-      try { j = text ? JSON.parse(text) : null; } catch {
+
+      let j: ListResponse | null = null;
+      try {
+        j = text ? (JSON.parse(text) as ListResponse) : null;
+      } catch {
         setStatus(`Fehler ${res.status}: Antwort war kein JSON.`);
-        setRows([]); return;
+        setRows([]);
+        return;
       }
-      if (!res.ok) { setStatus(`Fehler ${res.status}: ${j?.error || res.statusText}`); setRows([]); return; }
-      setRows(Array.isArray(j?.data) ? j.data : []);
+
+      if (!res.ok || !j) {
+        setStatus(`Fehler ${res.status}: ${j?.error || res.statusText}`);
+        setRows([]);
+        return;
+      }
+
+      setRows(Array.isArray(j.data) ? j.data : []);
       setStatus("");
-    } catch (err: any) {
-      setStatus(`Netzwerkfehler: ${err?.message || String(err)}`); setRows([]);
+    } catch (err) {
+      const e = err as Error;
+      setStatus(`Netzwerkfehler: ${e.message}`);
+      setRows([]);
     }
   }
 
   // Liste nach Projektwechsel neu laden
-  useEffect(() => { loadList(activeProject); /* eslint-disable-next-line */ }, [activeProject]);
+  useEffect(() => {
+    void loadList(activeProject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject]);
 
   function resetForm() {
     setEditingId(null);
@@ -83,7 +107,7 @@ export default function AdminDevlogsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("Sende…");
 
@@ -112,8 +136,12 @@ export default function AdminDevlogsPage() {
     });
 
     const text = await res.text();
-    let j: any = null; try { j = text ? JSON.parse(text) : null; } catch {}
-    if (!res.ok) { setStatus(`Fehler ${res.status}: ${j?.error || text || res.statusText}`); return; }
+    let j: ApiResponse | null = null;
+    try { j = text ? (JSON.parse(text) as ApiResponse) : null; } catch {}
+
+    if (!res.ok || !j || !("ok" in j && j.ok)) {
+      setStatus(`Fehler ${res.status}: ${(j as any)?.error || text || res.statusText}`); return;
+    }
 
     setStatus(method === "PATCH" ? "Aktualisiert ✓" : "Gespeichert ✓");
     await loadList(activeProject);
@@ -131,8 +159,12 @@ export default function AdminDevlogsPage() {
     });
 
     const text = await res.text();
-    let j: any = null; try { j = text ? JSON.parse(text) : null; } catch {}
-    if (!res.ok) { setStatus(`Fehler ${res.status}: ${j?.error || text || res.statusText}`); return; }
+    let j: ApiResponse | null = null;
+    try { j = text ? (JSON.parse(text) as ApiResponse) : null; } catch {}
+
+    if (!res.ok || !j || !("ok" in j && j.ok)) {
+      setStatus(`Fehler ${res.status}: ${(j as any)?.error || text || res.statusText}`); return;
+    }
 
     setStatus("Gelöscht ✓");
     await loadList(activeProject);
