@@ -14,10 +14,21 @@ type DevlogRow = {
   links?: LinkItem[];
 };
 
+type RowFromDB = {
+  id: string;
+  project: Project | null;
+  date: string | null;
+  title: string | null;
+  summary: string | null;
+  tags: string[] | null;
+  links: LinkItem[] | null;
+  created_at: string;
+};
+
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("Missing SUPABASE env vars (URL or SERVICE_ROLE_KEY).");
+  if (!url || !key) throw new Error("Missing SUPABASE env vars.");
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
@@ -46,14 +57,17 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
-    const rows: DevlogRow[] = (data ?? []).map((r: any) => ({
-      id: String(r.id),
-      project: r.project as Project,
-      date: typeof r.date === "string" && r.date ? r.date : new Date(r.created_at).toISOString().slice(0, 10),
-      title: String(r.title ?? ""),
-      summary: String(r.summary ?? ""),
-      tags: Array.isArray(r.tags) ? r.tags as string[] : undefined,
-      links: Array.isArray(r.links) ? r.links as LinkItem[] : undefined,
+    const rows: DevlogRow[] = ((data ?? []) as RowFromDB[]).map((r) => ({
+      id: r.id,
+      project: (r.project ?? project) as Project,
+      date:
+        r.date && r.date.length >= 10
+          ? r.date
+          : new Date(r.created_at).toISOString().slice(0, 10),
+      title: r.title ?? "",
+      summary: r.summary ?? "",
+      tags: r.tags ?? undefined,
+      links: r.links ?? undefined,
     }));
 
     return NextResponse.json({ data: rows });
