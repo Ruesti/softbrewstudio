@@ -17,6 +17,11 @@ type DevlogRow = {
   links?: LinkItem[];
 };
 
+type ListResponse = { data?: DevlogRow[]; error?: string };
+type ApiOK = { ok: true; data?: unknown };
+type ApiErr = { ok: false; error: string };
+type ApiResponse = ApiOK | ApiErr;
+
 const isUUID = (v: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 
@@ -38,7 +43,7 @@ export default function AdminDevlogsPage() {
   const [status, setStatus] = useState("");
 
   const canSubmit = useMemo(
-    () => adminKey.trim() && title.trim() && summary.trim() && (!editingId || isUUID(editingId)),
+    () => Boolean(adminKey.trim() && title.trim() && summary.trim() && (!editingId || isUUID(editingId))),
     [adminKey, title, summary, editingId]
   );
 
@@ -48,26 +53,45 @@ export default function AdminDevlogsPage() {
       const url = `/api/devlogs/list?project=${encodeURIComponent(p)}&limit=10`;
       const res = await fetch(url, { cache: "no-store" });
       const text = await res.text();
-      let j: any = null;
-      try { j = text ? JSON.parse(text) : null; } catch {
+
+      let j: unknown = null;
+      try {
+        j = text ? JSON.parse(text) : null;
+      } catch {
         setStatus(`Fehler ${res.status}: Antwort war kein JSON.`);
-        setRows([]); return;
+        setRows([]);
+        return;
       }
-      if (!res.ok) { setStatus(`Fehler ${res.status}: ${j?.error || res.statusText}`); setRows([]); return; }
-      setRows(Array.isArray(j?.data) ? j.data : []);
+
+      if (!res.ok) {
+        const err = (j as ListResponse)?.error ?? res.statusText;
+        setStatus(`Fehler ${res.status}: ${err}`);
+        setRows([]);
+        return;
+      }
+
+      const data = (j as ListResponse)?.data;
+      setRows(Array.isArray(data) ? data : []);
       setStatus("");
-    } catch (err: any) {
-      setStatus(`Netzwerkfehler: ${err?.message || String(err)}`); setRows([]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatus(`Netzwerkfehler: ${msg}`);
+      setRows([]);
     }
   }
 
   // Liste nach Projektwechsel neu laden
-  useEffect(() => { loadList(activeProject); /* eslint-disable-next-line */ }, [activeProject]);
+  useEffect(() => {
+    void loadList(activeProject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProject]);
 
   function resetForm() {
     setEditingId(null);
     setDate(new Date().toISOString().slice(0, 10));
-    setTitle(""); setSummary(""); setTags("");
+    setTitle("");
+    setSummary("");
+    setTags("");
     setLinks([{ label: "", href: "" }]);
   }
 
@@ -83,24 +107,31 @@ export default function AdminDevlogsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function submit(e: React.FormEvent) {
+  function isApiResponse(j: unknown): j is ApiResponse {
+    return !!j && typeof j === "object" && "ok" in (j as Record<string, unknown>);
+  }
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("Sende…");
 
     const payload = {
-      project: activeProject,  // ← gemeinsamer Selector steuert das Feld
+      project: activeProject, // ← gemeinsamer Selector steuert das Feld
       date,
       title,
       summary,
-      tags: tags.split(",").map(t => t.trim()).filter(Boolean),
-      links: links.filter(l => l.label && l.href),
+      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+      links: links.filter((l) => l.label && l.href),
     };
 
     let endpoint = "/api/devlogs";
     let method: "POST" | "PATCH" = "POST";
 
     if (editingId) {
-      if (!isUUID(editingId)) { setStatus(`Fehler: ungültige ID (${editingId})`); return; }
+      if (!isUUID(editingId)) {
+        setStatus(`Fehler: ungültige ID (${editingId})`);
+        return;
+      }
       endpoint = `/api/devlogs/${encodeURIComponent(editingId)}`;
       method = "PATCH";
     }
@@ -112,8 +143,19 @@ export default function AdminDevlogsPage() {
     });
 
     const text = await res.text();
-    let j: any = null; try { j = text ? JSON.parse(text) : null; } catch {}
-    if (!res.ok) { setStatus(`Fehler ${res.status}: ${j?.error || text || res.statusText}`); return; }
+    let j: unknown = null;
+    try {
+      j = text ? JSON.parse(text) : null;
+    } catch {}
+
+    if (!res.ok || !isApiResponse(j) || !j.ok) {
+      const msg =
+        (isApiResponse(j) && !j.ok ? j.error : undefined) ??
+        text ??
+        res.statusText;
+      setStatus(`Fehler ${res.status}: ${msg}`);
+      return;
+    }
 
     setStatus(method === "PATCH" ? "Aktualisiert ✓" : "Gespeichert ✓");
     await loadList(activeProject);
@@ -121,8 +163,14 @@ export default function AdminDevlogsPage() {
   }
 
   async function remove(id: string) {
-    if (!adminKey) { setStatus("Kein Admin-Key"); return; }
-    if (!isUUID(id)) { setStatus(`Fehler: ungültige ID (${id})`); return; }
+    if (!adminKey) {
+      setStatus("Kein Admin-Key");
+      return;
+    }
+    if (!isUUID(id)) {
+      setStatus(`Fehler: ungültige ID (${id})`);
+      return;
+    }
     if (!confirm("Diesen Devlog wirklich löschen?")) return;
 
     const res = await fetch(`/api/devlogs/${encodeURIComponent(id)}`, {
@@ -131,15 +179,26 @@ export default function AdminDevlogsPage() {
     });
 
     const text = await res.text();
-    let j: any = null; try { j = text ? JSON.parse(text) : null; } catch {}
-    if (!res.ok) { setStatus(`Fehler ${res.status}: ${j?.error || text || res.statusText}`); return; }
+    let j: unknown = null;
+    try {
+      j = text ? JSON.parse(text) : null;
+    } catch {}
+
+    if (!res.ok || !isApiResponse(j) || !j.ok) {
+      const msg =
+        (isApiResponse(j) && !j.ok ? j.error : undefined) ??
+        text ??
+        res.statusText;
+      setStatus(`Fehler ${res.status}: ${msg}`);
+      return;
+    }
 
     setStatus("Gelöscht ✓");
     await loadList(activeProject);
   }
 
-  const addLink = () => setLinks([...links, { label: "", href: "" }]);
-  const rmLink = (i: number) => setLinks(links.filter((_, idx) => idx !== i));
+  const addLink = () => setLinks((cur) => [...cur, { label: "", href: "" }]);
+  const rmLink = (i: number) => setLinks((cur) => cur.filter((_, idx) => idx !== i));
 
   return (
     <PageShell title="Devlogs – Admin" subtitle="Einträge anlegen, bearbeiten und löschen">
@@ -156,7 +215,7 @@ export default function AdminDevlogsPage() {
           <option value="linguai">LinguAI</option>
         </select>
         <button
-          onClick={() => loadList(activeProject)}
+          onClick={() => void loadList(activeProject)}
           className="rounded-md border border-softbrew.gray/60 px-3 py-2 text-softbrew-black hover:bg-softbrew-gray"
         >
           Neu laden
@@ -231,7 +290,9 @@ export default function AdminDevlogsPage() {
                     placeholder="Label"
                     value={l.label}
                     onChange={(e) => {
-                      const v = [...links]; v[i].label = e.target.value; setLinks(v);
+                      const v = [...links];
+                      v[i].label = e.target.value;
+                      setLinks(v);
                     }}
                     className="rounded-md border px-3 py-2 text-softbrew-black"
                   />
@@ -239,7 +300,9 @@ export default function AdminDevlogsPage() {
                     placeholder="https://…"
                     value={l.href}
                     onChange={(e) => {
-                      const v = [...links]; v[i].href = e.target.value; setLinks(v);
+                      const v = [...links];
+                      v[i].href = e.target.value;
+                      setLinks(v);
                     }}
                     className="rounded-md border px-3 py-2 text-softbrew-black"
                   />
@@ -289,12 +352,16 @@ export default function AdminDevlogsPage() {
         <h2 className="text-lg font-medium mb-3">Letzte Einträge</h2>
         <div className="space-y-3">
           {rows.map((r) => (
-            <div key={r.id} className="rounded-lg border border-softbrew.gray/60 bg-white p-4 shadow-sm text-softbrew-black">
+            <div
+              key={r.id}
+              className="rounded-lg border border-softbrew.gray/60 bg-white p-4 shadow-sm text-softbrew-black"
+            >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-xs text-softbrew-mid/80">{r.id}</div>
                   <div className="text-sm text-softbrew-mid">
-                    {r.date}{r.tags?.length ? " · " + r.tags.join(" · ") : ""}
+                    {r.date}
+                    {r.tags?.length ? " · " + r.tags.join(" · ") : ""}
                   </div>
                   <div className="font-medium">{r.title}</div>
                 </div>
@@ -307,7 +374,7 @@ export default function AdminDevlogsPage() {
                   </button>
                   <button
                     className="rounded-md border border-red-300 px-3 py-2 text-red-700 hover:bg-red-50"
-                    onClick={() => remove(r.id)}
+                    onClick={() => void remove(r.id)}
                   >
                     Löschen
                   </button>
@@ -317,7 +384,11 @@ export default function AdminDevlogsPage() {
               {Array.isArray(r.links) && r.links.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-3">
                   {r.links.map((l, i) => (
-                    <a key={i} href={l.href} className="underline decoration-softbrew-blue underline-offset-2 hover:opacity-80">
+                    <a
+                      key={i}
+                      href={l.href}
+                      className="underline decoration-softbrew-blue underline-offset-2 hover:opacity-80"
+                    >
                       {l.label} →
                     </a>
                   ))}
