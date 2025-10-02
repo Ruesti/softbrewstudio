@@ -1,6 +1,9 @@
+// src/app/layout.tsx
 import "./globals.css";
+import type { Metadata } from "next";
+import Link from "next/link";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Softbrew Studio – Build. Focus. Learn.",
   description: "FocusPilot, Shiftrix und LinguAI von Softbrew Studio.",
 };
@@ -13,19 +16,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <header className="sticky top-0 z-50 bg-softbrew-black/95 backdrop-blur border-b border-white/10">
           <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
             {/* Wortmarke – Logo kommt später */}
-            <a href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <span className="text-2xl md:text-3xl font-extrabold tracking-tight">Softbrew</span>
               <span className="text-xl md:text-2xl font-semibold text-softbrew-blue tracking-tight">
                 Studio
               </span>
-            </a>
+            </Link>
 
             <nav className="hidden sm:flex gap-5 text-sm">
-              <a href="/focuspilot" className="text-white/85 hover:text-white">FocusPilot</a>
-              <a href="/shiftrix"   className="text-white/85 hover:text-white">Shiftrix</a>
-              <a href="/linguai"    className="text-white/85 hover:text-white">LinguAI</a>
-              <a href="/updates"    className="text-white/85 hover:text-white">Updates</a>
-              <a href="/kontakt"    className="text-white/85 hover:text-white">Kontakt</a>
+              <Link href="/focuspilot" className="text-white/85 hover:text-white">FocusPilot</Link>
+              <Link href="/shiftrix"   className="text-white/85 hover:text-white">Shiftrix</Link>
+              <Link href="/linguai"    className="text-white/85 hover:text-white">LinguAI</Link>
+              <Link href="/updates"    className="text-white/85 hover:text-white">Updates</Link>
+              <Link href="/kontakt"    className="text-white/85 hover:text-white">Kontakt</Link>
             </nav>
           </div>
         </header>
@@ -38,9 +41,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto max-w-6xl px-4 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-white/80">
             <p>© {new Date().getFullYear()} Softbrew Studio</p>
             <div className="flex gap-4">
-              <a href="https://linktr.ee/softbrewstudio" className="hover:text-white">Linktree</a>
-              <a href="/impressum" className="hover:text-white">Impressum</a>
-              <a href="/datenschutz" className="hover:text-white">Datenschutz</a>
+              {/* Extern bleibt <a> */}
+              <a
+                href="https://linktr.ee/softbrewstudio"
+                className="hover:text-white"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Linktree
+              </a>
+              {/* Intern mit Link */}
+              <Link href="/impressum" className="hover:text-white">Impressum</Link>
+              <Link href="/datenschutz" className="hover:text-white">Datenschutz</Link>
             </div>
           </div>
         </footer>
