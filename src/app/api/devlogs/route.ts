@@ -28,8 +28,10 @@ export async function POST(req: Request) {
     const { data, error } = await supabase.from("devlogs").insert(payload).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true, data });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Unexpected server error" }, { status: 500 });
-  }
+} catch (e) {
+  const msg = e instanceof Error ? e.message : "Unexpected server error";
+  return NextResponse.json({ error: msg }, { status: 500 });
+}
+
 }
 
