@@ -31,8 +31,10 @@ export async function GET(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Unexpected server error" }, { status: 500 });
-  }
+} catch (e) {
+  const msg = e instanceof Error ? e.message : "Unexpected server error";
+  return NextResponse.json({ error: msg }, { status: 500 });
+}
+
 }
 
