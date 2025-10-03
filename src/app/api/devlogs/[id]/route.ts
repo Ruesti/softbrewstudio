@@ -24,9 +24,9 @@ type PatchBody = {
 };
 
 // GET /api/devlogs/[id]
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, context: { params: { id: string } }) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     if (!isUUID(id)) return NextResponse.json({ error: "Ungültige ID." }, { status: 400 });
 
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
@@ -45,16 +45,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 // PATCH /api/devlogs/[id]
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
   try {
     if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const { id } = params;
+    const { id } = context.params;
     if (!isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
 
     const body: PatchBody = await req.json();
     const patch: Partial<PatchBody> = {};
-
     if (body.project !== undefined) patch.project = body.project;
     if (body.date !== undefined) patch.date = body.date;
     if (body.title !== undefined) patch.title = String(body.title);
@@ -78,11 +77,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/devlogs/[id]
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
   try {
     if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const { id } = params;
+    const { id } = context.params;
     if (!isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
 
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
