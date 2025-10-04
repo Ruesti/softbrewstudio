@@ -6,8 +6,6 @@ const ADMIN_KEY  = process.env.DEVLOG_ADMIN_KEY!;
 const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const SB_URL     = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
-type RouteContext = { params: Record<string, string> };
-
 function isAuthed(req: NextRequest) {
   return (req.headers.get("x-admin-key") || "") === ADMIN_KEY;
 }
@@ -25,11 +23,17 @@ type PatchBody = {
   links?: LinkItem[];
 };
 
+// Hilfsfunktion: ID sicher aus unbekanntem Kontext holen
+function getIdFromContext(ctx: unknown): string | null {
+  const id = (ctx as { params?: { id?: unknown } })?.params?.id;
+  return typeof id === "string" ? id : null;
+}
+
 // GET /api/devlogs/[id]
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(_req: NextRequest, ctx: unknown) {
   try {
-    const id = context.params.id;
-    if (!isUUID(id)) return NextResponse.json({ error: "Ungültige ID." }, { status: 400 });
+    const id = getIdFromContext(ctx);
+    if (!id || !isUUID(id)) return NextResponse.json({ error: "Ungültige ID." }, { status: 400 });
 
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
     const { data, error } = await supabase
@@ -47,16 +51,12 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 // PATCH /api/devlogs/[id]
-export async function PATCH(req: NextRequest, context: RouteContext) {
+export async function PATCH(req: NextRequest, ctx: unknown) {
   try {
-    if (!isAuthed(req)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+    if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const id = context.params.id;
-    if (!isUUID(id)) {
-      return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
-    }
+    const id = getIdFromContext(ctx);
+    if (!id || !isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
 
     const body: PatchBody = await req.json();
     const patch: Partial<PatchBody> = {};
@@ -83,16 +83,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 }
 
 // DELETE /api/devlogs/[id]
-export async function DELETE(req: NextRequest, context: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: unknown) {
   try {
-    if (!isAuthed(req)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+    if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-    const id = context.params.id;
-    if (!isUUID(id)) {
-      return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
-    }
+    const id = getIdFromContext(ctx);
+    if (!id || !isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
 
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
     const { error } = await supabase.from("devlogs").delete().eq("id", id);
