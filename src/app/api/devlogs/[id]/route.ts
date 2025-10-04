@@ -6,6 +6,8 @@ const ADMIN_KEY  = process.env.DEVLOG_ADMIN_KEY!;
 const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const SB_URL     = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
+type RouteContext = { params: Record<string, string> };
+
 function isAuthed(req: NextRequest) {
   return (req.headers.get("x-admin-key") || "") === ADMIN_KEY;
 }
@@ -24,9 +26,9 @@ type PatchBody = {
 };
 
 // GET /api/devlogs/[id]
-export async function GET(_req: NextRequest, context: { params: { id: string } }) {
+export async function GET(_req: NextRequest, context: RouteContext) {
   try {
-    const { id } = context.params;
+    const id = context.params.id;
     if (!isUUID(id)) return NextResponse.json({ error: "Ungültige ID." }, { status: 400 });
 
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
@@ -45,12 +47,16 @@ export async function GET(_req: NextRequest, context: { params: { id: string } }
 }
 
 // PATCH /api/devlogs/[id]
-export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
-    if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    if (!isAuthed(req)) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
 
-    const { id } = context.params;
-    if (!isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
+    const id = context.params.id;
+    if (!isUUID(id)) {
+      return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
+    }
 
     const body: PatchBody = await req.json();
     const patch: Partial<PatchBody> = {};
@@ -77,12 +83,16 @@ export async function PATCH(req: NextRequest, context: { params: { id: string } 
 }
 
 // DELETE /api/devlogs/[id]
-export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
-    if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    if (!isAuthed(req)) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
 
-    const { id } = context.params;
-    if (!isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
+    const id = context.params.id;
+    if (!isUUID(id)) {
+      return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
+    }
 
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
     const { error } = await supabase.from("devlogs").delete().eq("id", id);
