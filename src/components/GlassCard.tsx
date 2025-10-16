@@ -24,6 +24,7 @@ type GlassProps = PropsWithChildren<{
   blur?: BlurMode;        // "none" | "hover" | "always"
   speed?: number;         // Einflug-Dauer
   hoverSpeed?: number;    // Hover-Lift-Dauer
+  delay?: number;
 }>;
 
 function GlassCard({
