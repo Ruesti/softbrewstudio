@@ -37,6 +37,7 @@ function GlassCard({
   hoverSpeed = 0.10,
   children,
 }: GlassProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Root: any = href ? Link : "div";
   const gradient = accentMap[accent];
 
