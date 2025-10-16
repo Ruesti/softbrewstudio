@@ -1,35 +1,26 @@
-import PageShell from "@/components/PageShell";
-import { Card } from "@/components/Card";
+// RICHTIG
+import GlassCard from "@/components/GlassCard";
+
 
 export default function ShiftrixPage() {
   return (
-    <PageShell title="Shiftrix" subtitle="Planung & Organisation für Teams.">
-      {/* Akzent-Section */}
-      <section className="rounded-brand p-6 bg-product-shiftrix text-white">
-        <h2 className="text-xl font-semibold mb-2">Baukasten für Schichten & Projekte</h2>
-        <p className="opacity-90">
-          Module flexibel aktivieren, Teams koordinieren, sauber abrechnen.
-        </p>
+    <section className="space-y-8">
+      <h1 className="text-3xl md:text-4xl font-semibold">Shiftrix</h1>
+      <p className="text-white/80 max-w-2xl">
+        Workforce- & Projektplanung flexibel, nachvollziehbar, skalierbar.
+      </p>
 
-        {/* Neutrale Cards innen */}
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <Card className="bg-white text-softbrew-black">
-            <Card.Header title="Schichtplanung" />
-            <Card.Body>Drag & Drop, Abwesenheiten, Regeln.</Card.Body>
-          </Card>
-
-          <Card className="bg-white text-softbrew-black">
-            <Card.Header title="Zeiterfassung" />
-            <Card.Body>Check-ins, Exporte, Auswertung.</Card.Body>
-          </Card>
-
-          <Card className="bg-white text-softbrew-black md:col-span-2">
-            <Card.Header title="Kommunikation & Doku" />
-            <Card.Body>Chat, Aufgaben, Dateien – alles an einem Ort.</Card.Body>
-          </Card>
-        </div>
-      </section>
-    </PageShell>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+        <GlassCard accent="shiftrix" animated={false}>
+          <h3 className="text-xl font-semibold">Scheduler</h3>
+          <p className="text-white/75 mt-2">Schichten, Projekte, Auslastung – klar visualisiert.</p>
+        </GlassCard>
+        <GlassCard accent="shiftrix" animated={false}>
+          <h3 className="text-xl font-semibold">Integrationen</h3>
+          <p className="text-white/75 mt-2">Stripe, Supabase, später Exporte.</p>
+        </GlassCard>
+      </div>
+    </section>
   );
 }
 

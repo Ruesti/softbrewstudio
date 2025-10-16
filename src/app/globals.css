@@ -10,3 +10,10 @@ body { @apply bg-softbrew-black text-white antialiased; }
 a { @apply text-softbrew-blue; }
 a:hover { @apply opacity-90; }
 
+/* Subtile Hintergrundzoom-Animation */
+@keyframes slow-zoom { from { transform: scale(1); } to { transform: scale(1.06); } }
+.motion-safe\:animate-slow-zoom { animation: slow-zoom 30s ease-in-out infinite alternate; }
+
+/* Bessere Lesbarkeit */
+html, body { text-rendering: optimizeLegibility; }
+

@@ -1,9 +1,11 @@
-import Link from "next/link";
+// RICHTIG
+import { motion } from "framer-motion";
+import GlassCard from "@/components/GlassCard";
+
 
 export default function Page() {
   return (
     <section className="space-y-12">
-      {/* Hero */}
       <div className="text-center space-y-5">
         <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">
           Wir bauen Tools für Macher.
@@ -13,52 +15,29 @@ export default function Page() {
         </p>
         <a
           className="inline-block rounded-brand bg-softbrew-blue px-6 py-3 text-white font-medium shadow hover:shadow-lg active:scale-[0.99] transition"
-          href="https://linktr.ee/softbrewstudio"
+          href="/updates"
         >
-          Updates & Beta
+          Beta & News
         </a>
       </div>
 
-      {/* Karten */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card
-          title="FocusPilot"
-          desc="Dein KI-CoPilot für Projekte & Fokus"
-          color="#7C3AED"
-          href="/focuspilot"
-        />
-        <Card
-          title="Shiftrix"
-          desc="Smarte Schicht- & Projektplanung"
-          color="#F97316"
-          href="/shiftrix"
-        />
-        <Card
-          title="LinguAI"
-          desc="Sprachen lernen mit echter KI"
-          color="#10B981"
-          href="/linguai"
-        />
+      <div id="produkte" className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+        <GlassCard href="/focuspilot" accent="focuspilot" >
+          <h3 className="text-xl font-semibold">FocusPilot</h3>
+          <p className="text-white/75 mt-2">Dein ruhiger Co-Pilot für Fokus & Projekte.</p>
+        </GlassCard>
+
+        <GlassCard href="/shiftrix" accent="shiftrix" delay={0.05}>
+          <h3 className="text-xl font-semibold">Shiftrix</h3>
+          <p className="text-white/75 mt-2">Flexible Workforce & Projekte im Griff.</p>
+        </GlassCard>
+
+        <GlassCard href="/linguai" accent="linguai" delay={0.1}>
+          <h3 className="text-xl font-semibold">LinguAI</h3>
+          <p className="text-white/75 mt-2">Sprachen lernen, das wirklich wirkt.</p>
+        </GlassCard>
       </div>
     </section>
-  );
-}
-
-function Card({
-  title, desc, color, href,
-}: { title: string; desc: string; color: string; href: string }) {
-  return (
-    <Link
-      href={href}
-      className="group block rounded-brand border border-white/10 bg-white/[0.03] p-6
-                 hover:bg-white/[0.05] hover:border-white/20 transition
-                 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
-    >
-      <div className="mb-4 h-1.5 w-16 rounded-full" style={{ backgroundColor: color }} />
-      <h3 className="text-xl font-semibold mb-1">{title}</h3>
-      <p className="text-white/70 mb-4">{desc}</p>
-      <span className="text-softbrew-blue">Mehr erfahren →</span>
-    </Link>
   );
 }
 

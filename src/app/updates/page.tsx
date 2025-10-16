@@ -3,6 +3,9 @@ import PageShell from "@/components/PageShell";
 import DevlogList from "@/components/DevlogList";
 import { supabaseServer } from "@/lib/supabaseServer";
 import Link from "next/link";
+// RICHTIG
+import GlassCard from "@/components/GlassCard";
+
 
 type LinkItem = { label: string; href: string };
 type DevlogRow = {
@@ -38,36 +41,51 @@ export default async function UpdatesPage() {
 
   return (
     <PageShell title="Updates" subtitle="Neuigkeiten & Devlogs von Softbrew Studio.">
-      <div className="grid gap-6 md:grid-cols-3">
-        <section className="rounded-brand p-5 bg-product-focuspilot text-white">
-          <h2 className="text-lg font-semibold mb-2">FocusPilot</h2>
-          <DevlogList items={fp} />
-          <div className="mt-4">
-            <Link className="inline-flex items-center gap-1 rounded-lg border border-white/70 px-3 py-2 text-white visited:text-white hover:bg-white/10 active:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60" href="/updates/focuspilot">
-              Alle Updates →
-            </Link>
+      <div className="grid gap-6 md:grid-cols-3 items-stretch">
+        <GlassCard accent="focuspilot" animated={false} className="p-0">
+          <div className="p-5">
+            <h2 className="text-lg font-semibold mb-2">FocusPilot</h2>
+            <DevlogList items={fp} />
+            <div className="mt-4">
+              <Link
+                href="/updates/focuspilot"
+                className="inline-flex items-center gap-1 rounded-lg border border-white/70 px-3 py-2 text-white hover:bg-white/10 active:bg-white/15"
+              >
+                Alle Updates →
+              </Link>
+            </div>
           </div>
-        </section>
+        </GlassCard>
 
-        <section className="rounded-brand p-5 bg-product-shiftrix text-white">
-          <h2 className="text-lg font-semibold mb-2">Shiftrix</h2>
-          <DevlogList items={sx} />
-          <div className="mt-4">
-            <Link className="inline-flex items-center gap-1 rounded-lg border border-white/70 px-3 py-2 text-white visited:text-white hover:bg-white/10 active:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60" href="/updates/shiftrix">
-              Alle Updates →
-            </Link>
+        <GlassCard accent="shiftrix" animated={false} className="p-0">
+          <div className="p-5">
+            <h2 className="text-lg font-semibold mb-2">Shiftrix</h2>
+            <DevlogList items={sx} />
+            <div className="mt-4">
+              <Link
+                href="/updates/shiftrix"
+                className="inline-flex items-center gap-1 rounded-lg border border-white/70 px-3 py-2 text-white hover:bg-white/10 active:bg-white/15"
+              >
+                Alle Updates →
+              </Link>
+            </div>
           </div>
-        </section>
+        </GlassCard>
 
-        <section className="rounded-brand p-5 bg-product-linguai text-white">
-          <h2 className="text-lg font-semibold mb-2">LinguAI</h2>
-          <DevlogList items={la} />
-          <div className="mt-4">
-            <Link className="inline-flex items-center gap-1 rounded-lg border border-white/70 px-3 py-2 text-white visited:text-white hover:bg-white/10 active:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/60" href="/updates/linguai">
-              Alle Updates →
-            </Link>
+        <GlassCard accent="linguai" animated={false} className="p-0">
+          <div className="p-5">
+            <h2 className="text-lg font-semibold mb-2">LinguAI</h2>
+            <DevlogList items={la} />
+            <div className="mt-4">
+              <Link
+                href="/updates/linguai"
+                className="inline-flex items-center gap-1 rounded-lg border border-white/70 px-3 py-2 text-white hover:bg-white/10 active:bg-white/15"
+              >
+                Alle Updates →
+              </Link>
+            </div>
           </div>
-        </section>
+        </GlassCard>
       </div>
     </PageShell>
   );

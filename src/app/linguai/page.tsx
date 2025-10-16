@@ -1,35 +1,25 @@
-import PageShell from "@/components/PageShell";
-import { Card } from "@/components/Card";
+// RICHTIG
+import GlassCard from "@/components/GlassCard";
 
-export default function LinguaiPage() {
+export default function LinguAIPage() {
   return (
-    <PageShell title="LinguAI" subtitle="Sprachen lernen – KI-gestützt & effizient.">
-      {/* Akzent-Section */}
-      <section className="rounded-brand p-6 bg-product-linguai text-white">
-        <h2 className="text-xl font-semibold mb-2">Lernen, das sich an dich anpasst</h2>
-        <p className="opacity-90">
-          Adaptive Übungen, echte Verständnistests, klare Fortschritte.
-        </p>
+    <section className="space-y-8">
+      <h1 className="text-3xl md:text-4xl font-semibold">LinguAI</h1>
+      <p className="text-white/80 max-w-2xl">
+        Echte Lernkurven statt Gamification – adaptiv und ruhig.
+      </p>
 
-        {/* Neutrale Cards innen */}
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <Card className="bg-white text-softbrew-black">
-            <Card.Header title="Adaptive Lessons" />
-            <Card.Body>Level-Erkennung, gezielte Wiederholung, Tempo-Anpassung.</Card.Body>
-          </Card>
-
-          <Card className="bg-white text-softbrew-black">
-            <Card.Header title="Aussprache & Dialoge" />
-            <Card.Body>Echtzeit-Feedback, praxisnahe Szenarien.</Card.Body>
-          </Card>
-
-          <Card className="bg-white text-softbrew-black md:col-span-2">
-            <Card.Header title="Vokabeln & Grammatik" />
-            <Card.Body>Smartes Spaced-Repetition, Regel-Erklärung im Kontext.</Card.Body>
-          </Card>
-        </div>
-      </section>
-    </PageShell>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+        <GlassCard accent="linguai" animated={false}>
+          <h3 className="text-xl font-semibold">Kernidee</h3>
+          <p className="text-white/75 mt-2">Personalisierte Drills, sinnvolle Wiederholungen, klare Ziele.</p>
+        </GlassCard>
+        <GlassCard accent="linguai" animated={false}>
+          <h3 className="text-xl font-semibold">Roadmap</h3>
+          <p className="text-white/75 mt-2">Decks, Audio, Live-Coach, Export nach Anki.</p>
+        </GlassCard>
+      </div>
+    </section>
   );
 }
 
