@@ -18,6 +18,8 @@ module.exports = {
           focuspilot: "#7C3AED",
           shiftrix:   "#F97316",
           linguai:    "#10B981",
+          kanaquest: "#FACC15" // warmes Gelb
+
         },
       },
       borderRadius: { brand: "1rem" },
