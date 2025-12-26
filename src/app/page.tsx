@@ -9,6 +9,9 @@ type Product = {
   devlogHref: string;
   bgClass: string;
 
+  // Alpha
+  alphaHref?: string;
+
   // Accent polish (uses your Tailwind tokens)
   accentRing: string;
   accentDot: string;
@@ -23,6 +26,7 @@ const products: Product[] = [
     tagline: "A calm co-pilot for focus & projects.",
     href: "/focuspilot",
     devlogHref: "/updates/focuspilot",
+    alphaHref: "https://focuspilot.softbrewstudio.com",
     bgClass: "bg-[url('/images/focuspilot-bg.jpg')]",
     accentRing: "ring-1 ring-product-focuspilot/35 group-hover:ring-product-focuspilot/55",
     accentDot: "bg-product-focuspilot",
@@ -36,6 +40,7 @@ const products: Product[] = [
     tagline: "Flexible workforce & project planning.",
     href: "/shiftrix",
     devlogHref: "/updates/shiftrix",
+    alphaHref: "https://shiftrix.softbrewstudio.com",
     bgClass: "bg-[url('/images/shiftrix-bg.jpg')]",
     accentRing: "ring-1 ring-product-shiftrix/35 group-hover:ring-product-shiftrix/55",
     accentDot: "bg-product-shiftrix",
@@ -48,6 +53,7 @@ const products: Product[] = [
     tagline: "Language learning that aims for real progress.",
     href: "/linguai",
     devlogHref: "/updates/linguai",
+    // alphaHref: "https://linguai.softbrewstudio.com", // later
     bgClass: "bg-[url('/images/linguai-bg.jpg')]",
     accentRing: "ring-1 ring-product-linguai/35 group-hover:ring-product-linguai/55",
     accentDot: "bg-product-linguai",
@@ -149,7 +155,7 @@ export default function HomePage() {
 
                 <p className="mt-2 text-sm text-white/80">{p.tagline}</p>
 
-                <div className="mt-4 flex items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3">
                   <Link
                     href={p.href}
                     className={[
@@ -167,6 +173,18 @@ export default function HomePage() {
                   >
                     Read notes
                   </Link>
+
+                  {p.alphaHref && (
+                    <a
+                      href={p.alphaHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="relative z-20 text-sm text-white/70 hover:text-white transition"
+                      aria-label={`Open ${p.name} alpha`}
+                    >
+                      Alpha ↗
+                    </a>
+                  )}
                 </div>
               </div>
 
