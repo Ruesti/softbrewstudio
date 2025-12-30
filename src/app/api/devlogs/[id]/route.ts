@@ -1,103 +1,111 @@
-// src/app/api/devlogs/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const ADMIN_KEY  = process.env.DEVLOG_ADMIN_KEY!;
+const ADMIN_KEY = process.env.DEVLOG_ADMIN_KEY!;
 const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const SB_URL     = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
 function isAuthed(req: NextRequest) {
   return (req.headers.get("x-admin-key") || "") === ADMIN_KEY;
 }
 
-const isUUID = (v: string) =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-
+type Project = "focuspilot" | "shiftrix" | "linguai";
+type PostType = "devlog" | "note";
+type PostStatus = "draft" | "published";
 type LinkItem = { label: string; href: string };
-type PatchBody = {
-  project?: "focuspilot" | "shiftrix" | "linguai";
-  date?: string;
-  title?: string;
-  summary?: string;
-  tags?: string[];
-  links?: LinkItem[];
-};
 
-// Hilfsfunktion: ID sicher aus unbekanntem Kontext holen
-function getIdFromContext(ctx: unknown): string | null {
-  const id = (ctx as { params?: { id?: unknown } })?.params?.id;
-  return typeof id === "string" ? id : null;
-}
+type PatchBody = Partial<{
+  project: Project;
+  type: PostType;
+  status: PostStatus;
 
-// GET /api/devlogs/[id]
-export async function GET(_req: NextRequest, ctx: unknown) {
+  date: string;
+  title: string;
+  summary: string;
+  content_md: string;
+
+  tags: string[];
+  links: LinkItem[];
+}>;
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const id = getIdFromContext(ctx);
-    if (!id || !isUUID(id)) return NextResponse.json({ error: "Ungültige ID." }, { status: 400 });
-
-    const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
-    const { data, error } = await supabase
-      .from("devlogs")
-      .select("id, project, date, title, summary, tags, links, created_at")
-      .eq("id", id)
-      .single();
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json({ data });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unexpected server error";
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-}
-
-// PATCH /api/devlogs/[id]
-export async function PATCH(req: NextRequest, ctx: unknown) {
-  try {
-    if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-
-    const id = getIdFromContext(ctx);
-    if (!id || !isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
-
-    const body: PatchBody = await req.json();
-    const patch: Partial<PatchBody> = {};
-    if (body.project !== undefined) patch.project = body.project;
-    if (body.date !== undefined) patch.date = body.date;
-    if (body.title !== undefined) patch.title = String(body.title);
-    if (body.summary !== undefined) patch.summary = String(body.summary);
-    if (body.tags !== undefined) patch.tags = body.tags;
-    if (body.links !== undefined) patch.links = body.links;
-
-    if (Object.keys(patch).length === 0) {
-      return NextResponse.json({ ok: false, error: "Kein Feld zum Aktualisieren." }, { status: 400 });
+    if (!isAuthed(req)) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const id = params.id;
+    const body = (await req.json()) as PatchBody;
+
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
-    const { error } = await supabase.from("devlogs").update(patch).eq("id", id);
+
+    // If switching to published, set published_at if not already set
+    let published_at: string | null | undefined = undefined;
+    if (body.status === "published") {
+      const { data: current, error: curErr } = await supabase
+        .from("devlogs")
+        .select("published_at")
+        .eq("id", id)
+        .single();
+
+      if (curErr) return NextResponse.json({ ok: false, error: curErr.message }, { status: 400 });
+
+      if (!current?.published_at) {
+        published_at = new Date().toISOString();
+      }
+    }
+
+    const updateRow: Record<string, unknown> = {};
+    const allowed: (keyof PatchBody)[] = [
+      "project",
+      "type",
+      "status",
+      "date",
+      "title",
+      "summary",
+      "content_md",
+      "tags",
+      "links",
+    ];
+
+    for (const k of allowed) {
+      if (typeof body[k] !== "undefined") updateRow[k] = body[k];
+    }
+
+    if (typeof published_at !== "undefined") {
+      updateRow.published_at = published_at;
+    }
+
+    const { data, error } = await supabase
+      .from("devlogs")
+      .update(updateRow)
+      .eq("id", id)
+      .select()
+      .single();
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, data });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unexpected server error";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
 
-// DELETE /api/devlogs/[id]
-export async function DELETE(req: NextRequest, ctx: unknown) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    if (!isAuthed(req)) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    if (!isAuthed(req)) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
 
-    const id = getIdFromContext(ctx);
-    if (!id || !isUUID(id)) return NextResponse.json({ ok: false, error: "Ungültige ID." }, { status: 400 });
-
+    const id = params.id;
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
-    const { error } = await supabase.from("devlogs").delete().eq("id", id);
 
+    const { error } = await supabase.from("devlogs").delete().eq("id", id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unexpected server error";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
-

@@ -64,38 +64,50 @@ export default function AdminDevlogsPage() {
     [adminKey, title, contentMd, editingId]
   );
 
-  async function loadList(p: Project = activeProject, t: PostType = activeType) {
-    setStatus("Lade Liste…");
-    try {
-      const url = `/api/devlogs/list?project=${encodeURIComponent(p)}&type=${encodeURIComponent(t)}&limit=10`;
-      const res = await fetch(url, { cache: "no-store" });
-      const text = await res.text();
-
-      let j: unknown = null;
-      try {
-        j = text ? JSON.parse(text) : null;
-      } catch {
-        setStatus(`Fehler ${res.status}: Antwort war kein JSON.`);
-        setRows([]);
-        return;
-      }
-
-      if (!res.ok) {
-        const err = (j as ListResponse)?.error ?? res.statusText;
-        setStatus(`Fehler ${res.status}: ${err}`);
-        setRows([]);
-        return;
-      }
-
-      const data = (j as ListResponse)?.data;
-      setRows(Array.isArray(data) ? data : []);
-      setStatus("");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setStatus(`Netzwerkfehler: ${msg}`);
+async function loadList(p: Project = activeProject, t: PostType = activeType) {
+  setStatus("Lade Liste…");
+  try {
+    if (!adminKey.trim()) {
+      setStatus("Bitte Admin-Key eingeben");
       setRows([]);
+      return;
     }
+
+    const url = `/api/devlogs/list?project=${encodeURIComponent(p)}&type=${encodeURIComponent(t)}&limit=10`;
+
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "x-admin-key": adminKey },
+    });
+
+    const text = await res.text();
+
+    let j: unknown = null;
+    try {
+      j = text ? JSON.parse(text) : null;
+    } catch {
+      setStatus(`Fehler ${res.status}: Antwort war kein JSON.`);
+      setRows([]);
+      return;
+    }
+
+    if (!res.ok) {
+      const err = (j as ListResponse)?.error ?? res.statusText;
+      setStatus(`Fehler ${res.status}: ${err}`);
+      setRows([]);
+      return;
+    }
+
+    const data = (j as ListResponse)?.data;
+    setRows(Array.isArray(data) ? data : []);
+    setStatus("");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    setStatus(`Netzwerkfehler: ${msg}`);
+    setRows([]);
   }
+}
+
 
   // Reload list when selectors change
   useEffect(() => {
