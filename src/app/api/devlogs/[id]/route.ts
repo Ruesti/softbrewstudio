@@ -28,13 +28,17 @@ type PatchBody = Partial<{
   links: LinkItem[];
 }>;
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     if (!isAuthed(req)) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await params;
+
     const body = (await req.json()) as PatchBody;
 
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
@@ -91,13 +95,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     if (!isAuthed(req)) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const id = params.id;
+    const { id } = await params;
+
     const supabase = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
 
     const { error } = await supabase.from("devlogs").delete().eq("id", id);
