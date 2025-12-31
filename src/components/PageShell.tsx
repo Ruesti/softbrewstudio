@@ -1,5 +1,6 @@
 // src/components/PageShell.tsx
 import React from "react";
+import Link from "next/link";
 
 export default function PageShell({
   title,
@@ -14,6 +15,22 @@ export default function PageShell({
 }) {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
+      {/* Context navigation */}
+      <nav className="mb-6 text-sm text-softbrew-mid flex gap-4">
+        <Link
+          href="/updates"
+          className="hover:text-softbrew-black transition-colors"
+        >
+          Updates
+        </Link>
+        <Link
+          href="/notes"
+          className="hover:text-softbrew-black transition-colors"
+        >
+          Notes
+        </Link>
+      </nav>
+
       <header className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
         {subtitle && (

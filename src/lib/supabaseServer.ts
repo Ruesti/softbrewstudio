@@ -1,11 +1,10 @@
-// src/lib/supabaseServer.ts
 import { createClient } from "@supabase/supabase-js";
 
-/**
- * Server-only Supabase Client (lesen via anon key)
- */
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
 export function supabaseServer() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  return createClient(url, anon, { auth: { persistSession: false } });
+  return createClient(SB_URL, SB_ANON, {
+    auth: { persistSession: false },
+  });
 }
