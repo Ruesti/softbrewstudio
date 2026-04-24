@@ -5,14 +5,13 @@ import { motion } from "framer-motion";
 import clsx from "clsx";
 import type { PropsWithChildren } from "react";
 
-type Accent = "focuspilot" | "shiftrix" | "linguai" | "neutral";
+type Accent = "focuspilot" | "hardware-copilot" | "neutral";
 type BlurMode = "none" | "hover" | "always";
 
 const accentMap: Record<Accent, string> = {
-  focuspilot: "from-product-focuspilot/40 to-product-focuspilot/10",
-  shiftrix:   "from-product-shiftrix/40 to-product-shiftrix/10",
-  linguai:    "from-product-linguai/40 to-product-linguai/10",
-  neutral:    "from-white/20 to-white/5",
+  focuspilot:          "from-product-focuspilot/40 to-product-focuspilot/10",
+  "hardware-copilot":  "from-product-hardware-copilot/40 to-product-hardware-copilot/10",
+  neutral:             "from-white/20 to-white/5",
 };
 
 type GlassProps = PropsWithChildren<{
@@ -36,6 +35,7 @@ function GlassCard({
   blur = "hover",
   speed = 0.22,
   hoverSpeed = 0.10,
+  delay = 0,
   children,
 }: GlassProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,7 +91,7 @@ function GlassCard({
         initial={{ y: 18, opacity: 0, scale: 0.985 }}
         whileInView={{ y: 0, opacity: 1, scale: 1 }}
         viewport={{ once: true, margin: "-20%" }}
-        transition={{ duration: speed, ease: "easeOut" }}
+        transition={{ duration: speed, ease: "easeOut", delay }}
         whileHover={{
           y: -6,
           scale: 1.01,
@@ -109,7 +109,7 @@ function GlassCard({
       initial={{ y: 18, opacity: 0, scale: 0.985 }}
       whileInView={{ y: 0, opacity: 1, scale: 1 }}
       viewport={{ once: true, margin: "-20%" }}
-      transition={{ duration: speed, ease: "easeOut" }}
+      transition={{ duration: speed, ease: "easeOut", delay }}
       whileHover={{
         y: -6,
         scale: 1.01,

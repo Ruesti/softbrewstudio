@@ -1,4 +1,4 @@
-type Product = "focuspilot" | "shiftrix" | "linguai";
+type Product = "focuspilot" | "hardware-copilot";
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("de-DE", { year: "numeric", month: "short", day: "2-digit" });
@@ -10,7 +10,7 @@ function excerpt(s: string, n = 260) {
 
 export default async function ProductUpdates({ params }: { params: { product: Product } }) {
   const product = params.product;
-  if (!["focuspilot","shiftrix","linguai"].includes(product)) return null;
+  if (!["focuspilot","hardware-copilot"].includes(product)) return null;
 
   const res = await fetch(`/api/devlogs/recent?project=${product}&limit=30`, { cache: "no-store" });
   const items = res.ok ? await res.json() : [];

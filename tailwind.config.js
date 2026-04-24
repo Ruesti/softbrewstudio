@@ -15,9 +15,8 @@ module.exports = {
           mid:   "#9CA3AF",
         },
         product: {
-          focuspilot: "#7C3AED",
-          shiftrix:   "#F97316",
-          linguai:    "#10B981",
+          focuspilot:          "#7C3AED",
+          "hardware-copilot":  "#D97706",
         },
       },
       borderRadius: { brand: "1rem" },

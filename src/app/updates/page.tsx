@@ -5,12 +5,11 @@ import { useEffect, useState } from "react";
 /* =========================================
    Config
 ========================================= */
-type Product = "focuspilot" | "shiftrix" | "linguai";
+type Product = "focuspilot" | "hardware-copilot";
 
 const PRODUCTS: { id: Product; title: string; accent: string; description: string }[] = [
-  { id: "focuspilot", title: "FocusPilot", accent: "#7C3AED", description: "KI-Co-Pilot für Projekte, Tagesstruktur, DevLogs & mehr." },
-  { id: "shiftrix",   title: "Shiftrix",   accent: "#F97316", description: "Workforce & Schichtplanung als Baukasten – flexibel, klar, schnell." },
-  { id: "linguai",    title: "LinguAI",    accent: "#10B981", description: "Sprachen lernen ohne Overload – adaptiv, motivierend, effektiv." },
+  { id: "focuspilot",       title: "FocusPilot",       accent: "#7C3AED", description: "AI co-pilot for project memory, decisions, and instant re-entry." },
+  { id: "hardware-copilot", title: "Hardware Copilot", accent: "#D97706", description: "AI desktop assistant from concept to component list. For hobbyists." },
 ];
 
 /* =========================================
@@ -69,7 +68,7 @@ type DevLog = {
 };
 
 /* =========================================
-   Fetch Hook
+   Fetch Hook DevLogs
 ========================================= */
 function useDevLogs(project: Product, limit = 3) {
   const [items, setItems] = useState<DevLog[] | null>(null);
@@ -192,7 +191,7 @@ function BetaStartButton({ product }: { product: Product }) {
     <>
       <button
         onClick={go}
-        className="ml-2 inline-flex items-center justify-center rounded-lg border border-white/35 px-3 py-1.5 text-sm text-white/90 hover:border-white/60"
+        className="inline-flex items-center justify-center rounded-lg border border-white/35 px-3 py-1.5 text-sm text-white/90 hover:border-white/60"
       >
         {checking ? "Prüfe…" : "Beta starten"}
       </button>
@@ -211,51 +210,85 @@ function BetaStartButton({ product }: { product: Product }) {
 }
 
 /* =========================================
-   Kompakte Newsletter-Action (ohne Beta-Felder)
+   Beta Footer (open vs coming_soon) + Warteliste
 ========================================= */
-function NewsletterCompact({ productId }: { productId: Product }) {
+function BetaFooter({ productId }: { productId: Product }) {
+  const [state, setState] = useState<"open" | "coming_soon" | "loading">("loading");
   const [email, setEmail] = useState("");
-  const [nlMsg, setNlMsg] = useState<string | null>(null);
-  const [nlLoading, setNlLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
-  async function subscribeNewsletter() {
-    setNlLoading(true); setNlMsg(null);
-    try {
-      const res = await fetch("/api/newsletter/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, product: productId }),
-      });
-      if (!res.ok) throw new Error((await res.text()) || "Fehler beim Anmelden.");
-      setNlMsg("Angemeldet! 🎉");
-      setEmail("");
-    } catch (e: any) {
-      setNlMsg(e?.message || "Etwas ist schiefgelaufen.");
-    } finally {
-      setNlLoading(false);
-    }
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/beta/config?product=${productId}`, { cache: "no-store" });
+        const data = await res.json();
+        if (res.ok) setState(data.state);
+        else setState("open"); // fallback
+      } catch {
+        setState("open");
+      }
+    })();
+  }, [productId]);
+
+  if (state === "loading") {
+    return <div className="mt-2 text-sm text-white/60">Lädt…</div>;
   }
 
-  return (
-    <div className="mt-3 space-y-2 text-sm">
-      <div className="flex gap-2">
-        <input
-          type="email"
-          placeholder="Newsletter – deine@email.de"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="flex-1 rounded-md border border-white/15 bg-black/30 px-3 py-1.5 text-sm"
-        />
-        <button
-          onClick={subscribeNewsletter}
-          disabled={nlLoading || !email}
-          className="rounded-md bg-white px-3 py-1.5 font-medium text-black disabled:opacity-50"
-          title="Für Produkt-Updates anmelden"
-        >
-          {nlLoading ? "Sende…" : "Anmelden"}
-        </button>
+  if (state === "coming_soon") {
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="inline-flex items-center gap-2 rounded-md border border-white/30 px-3 py-1.5 text-sm text-white/80">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-400" />
+          Beta kommt bald
+        </div>
+
+        {/* Warteliste */}
+        <div className="flex gap-2 pt-1">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Vorab anmelden – deine@email.de"
+            className="flex-1 rounded-md border border-white/15 bg-black/30 px-3 py-1.5 text-sm"
+          />
+          <button
+            onClick={async () => {
+              setSending(true); setMsg(null);
+              try {
+                const res = await fetch("/api/beta/waitlist", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ product: productId, email }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                setMsg("Danke! Wir melden uns.");
+                setEmail("");
+              } catch (e: any) {
+                setMsg(e?.message || "Konnte nicht gespeichert werden.");
+              } finally { setSending(false); }
+            }}
+            disabled={sending || !email}
+            className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-black disabled:opacity-50"
+          >
+            {sending ? "Sende…" : "Anmelden"}
+          </button>
+        </div>
+        {msg && <p className="text-[12px] text-white/70">{msg}</p>}
       </div>
-      {nlMsg && <p className="text-[12px] text-white/70">{nlMsg}</p>}
+    );
+  }
+
+  // state === "open"
+  return (
+    <div className="mt-2 flex items-center gap-3">
+      <a
+        href={`/updates/${productId}`}
+        className="inline-flex items-center justify-center rounded-lg border border-white/35 px-3 py-1.5 text-sm text-white/90 hover:border-white/60"
+      >
+        Alle Updates →
+      </a>
+      <BetaStartButton product={productId} />
     </div>
   );
 }
@@ -318,23 +351,8 @@ function DevLogColumn({ p }: { p: (typeof PRODUCTS)[number] }) {
         );
       })}
 
-      {/* CTA Row: Alle Updates + kompakte Newsletter + Beta-Start */}
-      <div className="mt-2">
-        <a
-          href={`/updates/${p.id}`}
-          className="inline-flex items-center justify-center rounded-lg border border-white/35 px-3 py-1.5 text-sm text-white/90 hover:border-white/60"
-        >
-          Alle Updates →
-        </a>
-
-        {/* Kompakter Newsletter */}
-        <NewsletterCompact productId={p.id} />
-
-        {/* Kompakter Beta-Start (ohne Passwortfeld) */}
-        <div className="mt-2">
-          <BetaStartButton product={p.id} />
-        </div>
-      </div>
+      {/* CTA & Beta-State / Warteliste */}
+      <BetaFooter productId={p.id} />
     </section>
   );
 }
@@ -348,12 +366,11 @@ export default function UpdatesPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold">Updates</h1>
         <p className="text-white/75">
-          Neuigkeiten & DevLogs – mit schnellem Zugang zu Newsletter & Beta.
+          Neuigkeiten & DevLogs – mit schnellem Zugang zu Beta oder Warteliste.
         </p>
       </header>
 
-      {/* 3 Spalten DevLogs; pro Spalte kompakte Actions unter „Alle Updates“ */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {PRODUCTS.map((p) => (
           <DevLogColumn key={p.id} p={p} />
         ))}
