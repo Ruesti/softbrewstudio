@@ -5,11 +5,9 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 
 const MAP = {
-  "/focuspilot": { desktop: "/bg/focuspilot-desktop.jpg", mobile: "/bg/focuspilot-mobile.jpg" },
-  "/shiftrix":   { desktop: "/bg/shiftrix-desktop.jpg",   mobile: "/bg/shiftrix-mobile.jpg" },
-  "/linguai":    { desktop: "/bg/linguai-desktop.jpg",    mobile: "/bg/linguai-mobile.jpg" },
-  "/updates":    { desktop: "/bg/updates-desktop.jpg",    mobile: "/bg/updates-mobile.jpg" },
-  "/":           { desktop: "/bg/softbrew-desktop.jpg",   mobile: "/bg/softbrew-mobile.jpg" },
+  "/focuspilot":       { desktop: "/bg/focuspilot-desktop.jpg",       mobile: "/bg/focuspilot-mobile.jpg" },
+  "/hardware-copilot": { desktop: "/bg/hardware-copilot-desktop.jpg", mobile: "/bg/hardware-copilot-desktop.jpg" },
+  "/":                 { desktop: "/bg/softbrew-desktop.jpg",          mobile: "/bg/softbrew-mobile.jpg" },
 } as const;
 
 export default function Background() {
