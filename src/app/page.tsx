@@ -30,14 +30,15 @@ export default function Page() {
 
       {/* FocusPilot — Featured */}
       <motion.div
-        className="relative overflow-hidden rounded-brand ring-1 ring-white/20 shadow-2xl"
+        className="group relative overflow-hidden rounded-brand ring-1 ring-white/20 hover:ring-white/30 shadow-2xl transition-colors duration-200 transform-gpu will-change-transform"
         initial={{ y: 28, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+        whileHover={{ y: -6, scale: 1.01, transition: { duration: 0.10, ease: "easeOut" } }}
       >
         {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-product-focuspilot/30 via-product-focuspilot/10 to-transparent" />
-        <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-gradient-to-br from-product-focuspilot/30 via-product-focuspilot/10 to-transparent opacity-30 transition-opacity duration-150 group-hover:opacity-55" />
+        <div className="absolute inset-0 bg-white/5 group-hover:bg-white/10 transition-colors duration-150 backdrop-blur-sm" />
 
         <div className="relative z-10 p-8 md:p-14">
           {/* Badge */}
