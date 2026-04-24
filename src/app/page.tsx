@@ -80,7 +80,7 @@ export default function Page() {
           Also building
         </p>
         <div className="max-w-lg">
-          <GlassCard href="/hardware-copilot" accent="hardware-copilot">
+          <GlassCard href="/hardware-copilot" accent="hardware-copilot" blur="none">
             <h3 className="text-xl font-semibold">Hardware Copilot</h3>
             <p className="text-white/65 mt-2 leading-relaxed">
               AI desktop assistant that guides you from rough concept to complete
