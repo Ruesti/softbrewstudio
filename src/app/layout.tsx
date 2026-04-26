@@ -8,8 +8,9 @@ import { BrandHeader } from "@/components/BrandHeader";
 
 
 export const metadata: Metadata = {
-title: "Softbrew Studio – Tools für Macher",
-description: "Drei Produkte, ein Ziel: weniger Frust, mehr Ergebnis.",
+  title: "FocusPilot – Know what you're doing, always",
+  description:
+    "FocusPilot tracks your decisions, remembers your context, and gets you back up to speed instantly. For solo builders and small teams who can't afford to lose momentum.",
 };
 
 
