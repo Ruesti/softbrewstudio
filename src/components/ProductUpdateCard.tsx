@@ -33,8 +33,8 @@ export default function ProductUpdateCard({ product, title, description, accent 
       }
       setNlMsg("Angemeldet! Bitte prüfe deine E-Mails (falls Double-Opt-In aktiv).");
       setEmail("");
-    } catch (e: any) {
-      setNlMsg(e.message || "Etwas ist schiefgelaufen.");
+    } catch (e: unknown) {
+      setNlMsg(e instanceof Error ? e.message : "Etwas ist schiefgelaufen.");
     } finally {
       setLoadingNL(false);
     }
@@ -55,8 +55,8 @@ export default function ProductUpdateCard({ product, title, description, accent 
       }
       // Cookie ist jetzt gesetzt → zur Beta-Seite navigieren
       window.location.href = `/beta/${product}`;
-    } catch (e: any) {
-      setBetaMsg(e.message || "Zugriff verweigert.");
+    } catch (e: unknown) {
+      setBetaMsg(e instanceof Error ? e.message : "Zugriff verweigert.");
     } finally {
       setLoadingBeta(false);
       setBetaPw("");

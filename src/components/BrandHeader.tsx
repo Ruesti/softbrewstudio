@@ -21,12 +21,12 @@ export function BrandHeader() {
           <Link href="/hardware-copilot" className="hover:text-white transition text-white/65">
             Hardware Copilot
           </Link>
-          <a
+          <Link
             href="/#early-access"
             className="rounded-brand bg-product-focuspilot px-4 py-2 font-medium text-white shadow hover:shadow-lg active:scale-[0.99] transition"
           >
             Early Access →
-          </a>
+          </Link>
         </nav>
       </div>
     </header>

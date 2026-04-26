@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   try {
     const { product, email } = await req.json() as { product: string; email: string };
 
-    if (!product || !PRODUCTS.includes(product as any)) {
+    if (!product || !(PRODUCTS as readonly string[]).includes(product)) {
       return NextResponse.json({ ok:false, error:"invalid_product" }, { status:400 });
     }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

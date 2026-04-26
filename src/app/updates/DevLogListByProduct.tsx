@@ -41,8 +41,8 @@ export default function DevLogListByProduct({
         const res = await fetch(`/api/devlogs/recent?project=${project}&limit=${limit}`, { cache: "no-store" });
         if (!res.ok) throw new Error(await res.text());
         setItems(await res.json());
-      } catch (e: any) {
-        setErr(e?.message || "DevLogs konnten nicht geladen werden.");
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : "DevLogs konnten nicht geladen werden.");
       }
     })();
   }, [project, limit]);

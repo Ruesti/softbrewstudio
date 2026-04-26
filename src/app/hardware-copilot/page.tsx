@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import GlassCard from "@/components/GlassCard";
 
@@ -68,12 +69,12 @@ export default function HardwareCopilotPage() {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.3, ease: "easeOut", delay: 0.16 }}
         >
-          <a
+          <Link
             href="/beta/hardware-copilot"
             className="inline-block rounded-brand bg-product-hardware-copilot px-7 py-3 font-medium text-white shadow hover:shadow-lg active:scale-[0.99] transition"
           >
             Join the Waitlist →
-          </a>
+          </Link>
           <span className="text-sm text-white/40">
             Built by a hobbyist, for hobbyists.
           </span>

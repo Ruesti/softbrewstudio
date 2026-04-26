@@ -31,23 +31,23 @@ function excerpt(s: string, n = 140) {
 function isImg(url: string) {
   return /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(url);
 }
-function pickThumb(links: any): string | null {
+function pickThumb(links: unknown): string | null {
   try {
     if (!links) return null;
     if (typeof links === "string") return isImg(links) ? links : pickThumb(JSON.parse(links));
     if (Array.isArray(links)) {
       const s = links.find((x) => typeof x === "string" && isImg(x));
       if (s) return s as string;
-      const o = links.find((x) => typeof x === "object" && x && typeof x.url === "string" && isImg(x.url));
-      if (o) return (o as any).url;
+      const o = links.find((x) => x && typeof x === "object" && typeof (x as Record<string, unknown>).url === "string" && isImg((x as Record<string, unknown>).url as string));
+      if (o) return (o as Record<string, unknown>).url as string;
     }
     if (typeof links === "object") {
       for (const k of ["image", "thumbnail", "thumb", "cover", "url"]) {
-        const v: any = (links as any)[k];
+        const v = (links as Record<string, unknown>)[k];
         if (typeof v === "string" && isImg(v)) return v;
-        if (v && typeof v.url === "string" && isImg(v.url)) return v.url;
+        if (v && typeof v === "object" && typeof (v as Record<string, unknown>).url === "string" && isImg((v as Record<string, unknown>).url as string)) return (v as Record<string, unknown>).url as string;
       }
-      const vals = Object.values(links);
+      const vals = Object.values(links as Record<string, unknown>);
       const str = vals.find((v) => typeof v === "string" && isImg(v as string));
       if (str) return str as string;
     }
@@ -64,7 +64,7 @@ type DevLog = {
   created_at: string; // from 'date'
   title: string;
   body: string;       // from 'summary'
-  links?: any;
+  links?: unknown;
 };
 
 /* =========================================
@@ -82,8 +82,8 @@ function useDevLogs(project: Product, limit = 3) {
         if (!res.ok) throw new Error(await res.text());
         const data = (await res.json()) as DevLog[];
         if (!cancelled) setItems(data);
-      } catch (e: any) {
-        if (!cancelled) setErr(e?.message || "DevLogs konnten nicht geladen werden.");
+      } catch (e: unknown) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : "DevLogs konnten nicht geladen werden.");
       }
     })();
     return () => { cancelled = true; };
@@ -123,8 +123,8 @@ function BetaModal({
       });
       if (!res.ok) throw new Error((await res.text()) || "Passwort falsch.");
       onSuccess();
-    } catch (e: any) {
-      setMsg(e?.message || "Zugriff verweigert.");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Zugriff verweigert.");
     } finally {
       setLoading(false);
     }
@@ -264,8 +264,8 @@ function BetaFooter({ productId }: { productId: Product }) {
                 if (!res.ok) throw new Error(await res.text());
                 setMsg("Danke! Wir melden uns.");
                 setEmail("");
-              } catch (e: any) {
-                setMsg(e?.message || "Konnte nicht gespeichert werden.");
+              } catch (e: unknown) {
+                setMsg(e instanceof Error ? e.message : "Konnte nicht gespeichert werden.");
               } finally { setSending(false); }
             }}
             disabled={sending || !email}

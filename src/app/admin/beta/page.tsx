@@ -22,8 +22,8 @@ export default function BetaAdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Fehler");
       setItems(data.items as Item[]);
-    } catch (e: any) {
-      setMsg(e.message || "Konnte Daten nicht laden.");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Konnte Daten nicht laden.");
       setItems(null);
     } finally { setLoading(false); }
   }
@@ -42,8 +42,8 @@ export default function BetaAdminPage() {
       setMsg("Gespeichert.");
       // UI aktualisieren
       setItems(prev => prev?.map(it => it.product === p ? { ...it, ...patch } as Item : it) ?? null);
-    } catch (e: any) {
-      setMsg(e.message || "Fehler beim Speichern.");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Fehler beim Speichern.");
     } finally { setLoading(false); }
   }
 

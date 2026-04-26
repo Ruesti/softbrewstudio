@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       maxAge: 60*60*24*14,    // 14 Tage
     });
     return res;
-  } catch (e) {
+  } catch {
     return NextResponse.json({ ok:false, error:"bad_request" }, { status:400 });
   }
 }
