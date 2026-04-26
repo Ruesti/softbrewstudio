@@ -15,7 +15,7 @@ export async function GET(req: Request) {
 
   // Kein optional chaining -> maximal kompatibel
   const name = "beta_" + product;
-  const cookie = cookies().get(name);
+  const cookie = (await cookies()).get(name);
   const authorized = !!cookie && cookie.value === "1";
 
   return NextResponse.json({ ok: true, authorized });
