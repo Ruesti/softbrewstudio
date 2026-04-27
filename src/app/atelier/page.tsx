@@ -156,8 +156,9 @@ function PaymentsTab({ tenants }: { tenants: Tenant[] }) {
   const [year,     setYear]     = useState(now.getFullYear());
   const [month,    setMonth]    = useState(now.getMonth() + 1);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading,  setLoading]  = useState(false);
-  const [busy,     setBusy]     = useState<string | null>(null);
+  const [loading,   setLoading]  = useState(false);
+  const [busy,      setBusy]     = useState<string | null>(null);
+  const [multiPick, setMultiPick] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -230,29 +231,50 @@ function PaymentsTab({ tenants }: { tenants: Tenant[] }) {
           )}
           {sorted.map((t) => {
             const paid = paidMap.get(t.id);
+            const isOpen = multiPick === t.id;
             return (
-              <div key={t.id} className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition">
-                <button
-                  onClick={() => toggle(t)}
-                  disabled={busy === t.id}
-                  className={`h-5 w-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition ${
-                    paid
-                      ? "border-green-400 bg-green-400 text-black"
-                      : "border-white/30 hover:border-white/60"
-                  }`}
-                >
-                  {paid && <span className="text-xs font-bold leading-none">✓</span>}
-                </button>
-                <div className="flex-1">
-                  <div className="font-medium">{t.name}</div>
-                  <div className="text-xs text-white/50">Atelier {t.atelier}</div>
+              <div key={t.id}>
+                <div className="flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition">
+                  <button
+                    onClick={() => toggle(t)}
+                    disabled={busy === t.id}
+                    className={`h-5 w-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition ${
+                      paid
+                        ? "border-green-400 bg-green-400 text-black"
+                        : "border-white/30 hover:border-white/60"
+                    }`}
+                  >
+                    {paid && <span className="text-xs font-bold leading-none">✓</span>}
+                  </button>
+                  <div className="flex-1">
+                    <div className="font-medium">{t.name}</div>
+                    <div className="text-xs text-white/50">Atelier {t.atelier}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-white/80">{euro(t.betrag)}</div>
+                    {paid && (
+                      <div className="text-xs text-white/40">{isoToDisplay(paid.date)}</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setMultiPick(isOpen ? null : t.id)}
+                    className={`rounded-md border px-2.5 py-1 text-xs transition ${
+                      isOpen
+                        ? "border-white/40 text-white"
+                        : "border-white/15 text-white/40 hover:border-white/40 hover:text-white/70"
+                    }`}
+                  >
+                    Monate
+                  </button>
                 </div>
-                <div className="text-right">
-                  <div className="text-white/80">{euro(t.betrag)}</div>
-                  {paid && (
-                    <div className="text-xs text-white/40">{isoToDisplay(paid.date)}</div>
-                  )}
-                </div>
+                {isOpen && (
+                  <MultiMonthPicker
+                    tenant={t}
+                    year={year}
+                    onClose={() => setMultiPick(null)}
+                    onRefresh={load}
+                  />
+                )}
               </div>
             );
           })}
@@ -395,8 +417,81 @@ function TenantsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefresh: () =
   );
 }
 
+// ── Multi-Month Picker ─────────────────────────────────────────────────────────
+function MultiMonthPicker({
+  tenant, year, onClose, onRefresh,
+}: { tenant: Tenant; year: number; onClose: () => void; onRefresh: () => void }) {
+  const [yearPayments, setYearPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await sb.from("payments").select("*").eq("tenant_id", tenant.id).eq("year", year);
+      setYearPayments(data ?? []);
+      setLoading(false);
+    })();
+  }, [tenant.id, year]);
+
+  async function toggle(mo: number) {
+    setBusy(mo);
+    const existing = yearPayments.find((p) => p.month === mo);
+    if (existing) {
+      await sb.from("payments").delete().eq("id", existing.id);
+      setYearPayments((ps) => ps.filter((p) => p.month !== mo));
+    } else {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await sb
+        .from("payments")
+        .insert({ tenant_id: tenant.id, year, month: mo, date: today })
+        .select()
+        .single();
+      if (data) setYearPayments((ps) => [...ps, data as Payment]);
+    }
+    setBusy(null);
+    onRefresh();
+  }
+
+  const paidMonths = new Set(yearPayments.map((p) => p.month));
+
+  return (
+    <div className="border-t border-white/10 bg-black/20 px-4 py-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-medium">{tenant.name} — {year}</span>
+        <button onClick={onClose} className="text-xs text-white/40 hover:text-white/70 transition">
+          ✕ Schließen
+        </button>
+      </div>
+      {loading ? (
+        <p className="text-sm text-white/50">Lädt…</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {MONTHS.map((m, i) => {
+            const mo = i + 1;
+            const paid = paidMonths.has(mo);
+            return (
+              <button
+                key={mo}
+                onClick={() => toggle(mo)}
+                disabled={busy === mo}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  paid
+                    ? "bg-green-500/20 border border-green-500/50 text-green-300"
+                    : "border border-white/15 text-white/50 hover:border-white/40 hover:text-white/80"
+                }`}
+              >
+                {m}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── CSV Import ─────────────────────────────────────────────────────────────────
-type CsvRow = { date: string; rawName: string; amount: number; matched: Tenant | null };
+type CsvRow = { date: string; rawName: string; amount: number; matched: Tenant | null; months: number };
 
 function CsvImport({ tenants, onDone }: { tenants: Tenant[]; onDone: () => void }) {
   const now = new Date();
@@ -454,13 +549,19 @@ function CsvImport({ tenants, onDone }: { tenants: Tenant[]; onDone: () => void 
         t.name.toLowerCase().split(" ").some((part) => part.length > 3 && rawName.toLowerCase().includes(part))
       ) ?? null;
 
+      // Mehrmonatszahlung erkennen: Betrag ≈ N × Monatsmiete (Toleranz 12%)
+      const ratio   = matched ? rawAmount / matched.betrag : 1;
+      const rounded = Math.round(ratio);
+      const months  = (matched && rounded >= 1 && rounded <= 12 && Math.abs(ratio - rounded) / rounded < 0.12)
+        ? rounded : 1;
+
       // DD.MM.YYYY → YYYY-MM-DD
       const parts = cols[dateCol].split(".");
       const isoDate = parts.length === 3
         ? `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`
         : cols[dateCol];
 
-      parsed.push({ date: isoDate, rawName, amount: rawAmount, matched });
+      parsed.push({ date: isoDate, rawName, amount: rawAmount, matched, months });
     }
 
     if (parsed.length === 0) {
@@ -487,21 +588,21 @@ function CsvImport({ tenants, onDone }: { tenants: Tenant[]; onDone: () => void 
     let count = 0;
     for (const row of matched) {
       if (!row.matched) continue;
-      const { data: existing } = await sb
-        .from("payments")
-        .select("id")
-        .eq("tenant_id", row.matched.id)
-        .eq("year", year)
-        .eq("month", month)
-        .limit(1);
-      if (!existing || existing.length === 0) {
-        await sb.from("payments").insert({
-          tenant_id: row.matched.id,
-          year,
-          month,
-          date: row.date,
-        });
-        count++;
+      // Bei Mehrmonatszahlung: aktueller Monat + N-1 Monate rückwärts
+      for (let offset = 0; offset < row.months; offset++) {
+        let tMonth = month - offset;
+        let tYear  = year;
+        while (tMonth <= 0) { tMonth += 12; tYear--; }
+        const { data: ex } = await sb
+          .from("payments").select("id")
+          .eq("tenant_id", row.matched.id)
+          .eq("year", tYear).eq("month", tMonth).limit(1);
+        if (!ex || ex.length === 0) {
+          await sb.from("payments").insert({
+            tenant_id: row.matched.id, year: tYear, month: tMonth, date: row.date,
+          });
+          count++;
+        }
       }
     }
     setImporting(false);
@@ -512,6 +613,7 @@ function CsvImport({ tenants, onDone }: { tenants: Tenant[]; onDone: () => void 
   }
 
   const matchedCount = rows.filter((r) => r.matched).length;
+  const totalMonths  = rows.filter((r) => r.matched).reduce((s, r) => s + r.months, 0);
 
   return (
     <div className="space-y-5">
@@ -571,23 +673,28 @@ function CsvImport({ tenants, onDone }: { tenants: Tenant[]; onDone: () => void 
               disabled={importing || matchedCount === 0}
               className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50 hover:bg-white/90 transition"
             >
-              {importing ? "Importiert…" : `${matchedCount} importieren`}
+              {importing ? "Importiert…" : totalMonths > matchedCount ? `${matchedCount} Zeilen (${totalMonths} Monate) importieren` : `${matchedCount} importieren`}
             </button>
           </div>
 
           <div className="divide-y divide-white/10 rounded-xl border border-white/10 bg-white/5 text-sm overflow-hidden">
-            <div className="grid grid-cols-[1rem_6rem_1fr_7rem_8rem] gap-3 px-4 py-2 text-xs text-white/40 font-medium uppercase tracking-wide">
-              <span /> <span>Datum</span> <span>Name</span> <span>Betrag</span> <span>Erkannt als</span>
+            <div className="grid grid-cols-[1rem_6rem_1fr_7rem_4rem_8rem] gap-3 px-4 py-2 text-xs text-white/40 font-medium uppercase tracking-wide">
+              <span /> <span>Datum</span> <span>Name</span> <span>Betrag</span> <span>Monate</span> <span>Erkannt als</span>
             </div>
             {rows.map((row, i) => (
               <div
                 key={i}
-                className={`grid grid-cols-[1rem_6rem_1fr_7rem_8rem] items-center gap-3 px-4 py-3 ${!row.matched ? "opacity-35" : ""}`}
+                className={`grid grid-cols-[1rem_6rem_1fr_7rem_4rem_8rem] items-center gap-3 px-4 py-3 ${!row.matched ? "opacity-35" : ""}`}
               >
                 <div className={`h-2 w-2 rounded-full ${row.matched ? "bg-green-400" : "bg-white/20"}`} />
                 <div className="text-white/50 text-xs">{isoToDisplay(row.date)}</div>
                 <div className="truncate">{row.rawName}</div>
                 <div className="tabular-nums text-white/70">{euro(row.amount)}</div>
+                <div className="text-xs text-center">
+                  {row.months > 1
+                    ? <span className="rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 px-1.5 py-0.5">{row.months}×</span>
+                    : <span className="text-white/30">1×</span>}
+                </div>
                 <div className="text-xs text-white/50 truncate">
                   {row.matched ? row.matched.name : "—"}
                 </div>
