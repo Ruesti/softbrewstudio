@@ -1,0 +1,72 @@
+---
+title: "Teil 3: Tailscale als privates Netz"
+part: 3
+slug: "tailscale-privates-netz"
+summary: "Wie ich NUC, GPU-Box und Laptop über Tailscale zu einem privaten Netz verbunden habe – mit MagicDNS-Namen, einem SSH-Alias und zwei Wegen, den loopback-gebundenen Daemon trotzdem zu erreichen."
+date: "2026-07-13"
+readingTime: "6 min"
+tags: ["Tailscale", "Netzwerk", "VPN", "Homelab"]
+---
+
+Der NUC aus Teil 2 läuft jetzt zuverlässig zuhause. Aber "zuhause" ist nicht dort, wo ich meistens bin. Ich brauche einen Weg, von Laptop oder Handy aus an diese Maschine heranzukommen – ohne einen Port im Router zu öffnen und ohne eine öffentliche IP-Adresse zu riskieren. Genau dafür nutze ich Tailscale: ein VPN, das auf WireGuard aufbaut und alle meine Geräte in ein einziges privates Netz packt, egal wo sie gerade stehen.
+
+## Den NUC ins Tailnet holen
+
+Der erste Schritt ist auf jedem Gerät derselbe: Tailscale installieren und mit einem sprechenden Hostnamen beitreten.
+
+```bash title="NUC ins Tailnet aufnehmen"
+sudo tailscale up --hostname=nuc
+```
+
+Damit taucht die Maschine im Tailnet unter dem Namen `nuc` auf. Dank MagicDNS muss ich mir keine IP-Adressen merken – `nuc`, `pc` und `laptop` reichen als Hostnamen. Falls ich die IPs doch mal brauche: `nuc` liegt bei mir auf `100.97.223.43`, `pc` – meine GPU-Maschine mit der 3090 – auf `100.110.170.56`.
+
+## Operator-Modus, damit Taildrop ohne sudo läuft
+
+Ein Detail, das mich anfangs gestolpert hat: Viele `tailscale`-Unterbefehle, insbesondere `tailscale file get` und `tailscale file cp` für Taildrop-Transfers, wollen standardmäßig root-Rechte. Das wollte ich nicht – ich will als normaler Nutzer Dateien hin- und herschieben können, ohne jedes Mal `sudo` davorzuschreiben. Die Lösung ist ein einziger Befehl:
+
+```bash title="Operator setzen"
+sudo tailscale set --operator=uli
+```
+
+Danach kann mein eigener Nutzer `uli` alle Tailscale-Kommandos ohne `sudo` ausführen. Das ist besonders für Taildrop wichtig, das ich in den späteren Teilen (6 und 7) für Datei-Transfers zwischen NUC, GPU-Box und Laptop nutze – etwa um fertige Bilder von der 3090-Maschine automatisch aufs Handy oder den Laptop zu schicken.
+
+## Ein SSH-Alias für die GPU-Box
+
+Damit ich mir den Tailscale-Hostnamen der GPU-Box nicht bei jedem SSH-Login merken muss, habe ich mir in `~/.ssh/config` einen Alias angelegt:
+
+```ini title="~/.ssh/config"
+Host gpu-box
+    HostName pc
+    User uli
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+Ab da reicht `ssh gpu-box`, und ich lande auf der 3090-Maschine – über Tailscale, ohne dass die Maschine irgendwo im öffentlichen Internet sichtbar wäre.
+
+## An den Daemon herankommen, obwohl er nur Loopback bindet
+
+Der Daemon auf dem NUC bindet, wie in Teil 2 beschrieben, ausschließlich an `127.0.0.1`. Das ist Absicht – aber es bedeutet auch, dass ich ihn nicht einfach über die Tailscale-IP des NUC erreichen kann. Dafür gibt es zwei Wege, die ich beide nutze, je nachdem, was gerade praktischer ist.
+
+Der erste ist ein klassischer SSH-Tunnel:
+
+```bash title="SSH-Tunnel zum Daemon"
+ssh -L 7430:127.0.0.1:7430 nuc
+```
+
+Das bindet lokal auf meinem Laptop den Port 7430 und leitet ihn über SSH auf den Loopback-Port des NUC um. Danach kann ich lokal auf `127.0.0.1:7430` zugreifen, als säße ich direkt am NUC.
+
+Die Alternative ist `tailscale serve`, das ich remote per SSH anstoße:
+
+```bash title="tailscale serve aus der Ferne aktivieren"
+ssh uli@nuc 'tailscale serve --bg --http=7430 127.0.0.1:7430'
+```
+
+Das macht den Daemon-Port innerhalb des Tailnet erreichbar, im Hintergrund laufend, ohne dass ich dafür eine dauerhafte SSH-Sitzung offenhalten muss. Welchen der beiden Wege ich nehme, hängt vor allem davon ab, ob ich nur kurz reinschauen will (Tunnel) oder ob ich möchte, dass etwa das Cockpit aus Teil 5 dauerhaft Zugriff hat (`tailscale serve`).
+
+<Callout type="info">
+Was in meinem Setup bewusst fehlt: eine Tailscale-ACL-Datei. Ich habe keine feingranularen Zugriffsregeln zwischen den Geräten definiert – das Tailnet ist bei mir klein genug (NUC, GPU-Box, Laptop, Handy), dass die Standardeinstellungen ausreichen. Das ist kein verstecktes Feature, das ich einfach nicht erwähne, sondern schlicht (noch) nicht umgesetzt.
+</Callout>
+
+## Was das für den Rest der Serie bedeutet
+
+Ab jetzt ist jedes Gerät in dieser Serie über einen Namen ansprechbar: `nuc`, `pc`, `laptop`. Kein Port-Forwarding, keine öffentliche IP, kein Grund zur Sorge, dass irgendwer von außen an den Daemon herankommt. Damit ist die Netzwerk-Basis fertig. In Teil 4 geht es an den eigentlichen Kern des Projekts: wie ich Claude Code headless auf dem NUC laufen lasse, welche Kommandos ich dafür spawne – und eine Lektion über Token-Zählung, die mich fast mein Budget gekostet hätte.
