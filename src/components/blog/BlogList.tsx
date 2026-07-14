@@ -7,7 +7,7 @@ export default function BlogList({ posts }: { posts: BlogMeta[] }) {
     <div className="grid gap-5">
       {posts.map((p) => (
         <Link key={p.slug} href={`/blog/${p.slug}`} className="block">
-          <GlassCard accent="focuspilot" animated={false} className="p-0">
+          <GlassCard accent="neutral" animated={false} className="p-0">
             <div className="p-5">
               <div className="text-xs font-semibold text-softbrew-blue">
                 Teil {p.part} / {posts.length}
