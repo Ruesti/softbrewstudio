@@ -25,6 +25,6 @@ module.exports = {
       borderRadius: { brand: "1rem" },
     },
   },
-  plugins: [],
+  plugins: [require("@tailwindcss/typography")],
 };
 

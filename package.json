@@ -12,12 +12,17 @@
     "@supabase/supabase-js": "^2.57.4",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.22",
+    "gray-matter": "^4.0.3",
     "next": "^16.1.1",
+    "next-mdx-remote": "^6.0.0",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "rehype-pretty-code": "^0.14.4",
+    "shiki": "^4.3.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
