@@ -17,3 +17,12 @@ a:hover { @apply opacity-90; }
 /* Bessere Lesbarkeit */
 html, body { text-rendering: optimizeLegibility; }
 
+/* Blog code blocks (rehype-pretty-code / Shiki) */
+[data-rehype-pretty-code-figure] { position: relative; }
+[data-rehype-pretty-code-figure] pre { overflow-x: auto; border-radius: 0.75rem; padding: 1rem; }
+[data-rehype-pretty-code-figure] code { display: grid; font-size: 0.85rem; }
+[data-rehype-pretty-code-title] {
+  font-size: 0.75rem; color: #9CA3AF; padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(255,255,255,0.1); border-bottom: none;
+  border-radius: 0.5rem 0.5rem 0 0; background: rgba(0,0,0,0.4);
+}
