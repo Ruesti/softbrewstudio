@@ -1,0 +1,43 @@
+---
+title: "Teil 1: Warum ein eigener Server"
+part: 1
+slug: "warum-eigener-server"
+summary: "Der Auftakt einer Serie über meinen eigenen KI-Server zuhause: warum ich Daten, Budget und Netzwerk lieber selbst kontrolliere – und warum ausgerechnet dieser Blog trotzdem auf Vercel läuft."
+date: "2026-07-13"
+readingTime: "7 min"
+tags: ["Homelab", "KI", "Selbsthosting", "Claude Code"]
+---
+
+Ich schreibe diesen Artikel auf einem Blog, der auf Vercel läuft. Nicht auf meinem eigenen Server. Das ist kein Widerspruch, zu dem ich mich rausreden muss – aber es lohnt sich, am Anfang dieser Serie kurz zu erklären, warum ich trotzdem seit einigen Monaten Zeit und Nerven in einen eigenen KI-Server zuhause stecke.
+
+Die kurze Antwort: Ein Blog und ein KI-Server lösen unterschiedliche Probleme. Der Blog soll für alle jederzeit erreichbar sein, egal was bei mir zuhause gerade passiert. Der KI-Server soll das genaue Gegenteil sein – ein privates Stück Infrastruktur, das nur mir gehört, das ich nicht mit jemandem teile, und über das ich die volle Kontrolle habe. Beides gleichzeitig auf derselben Maschine zu wollen, wäre der falsche Kompromiss.
+
+## Datenhoheit ist der eigentliche Grund
+
+Wenn ich einen KI-Agenten stundenlang an echten Projekten arbeiten lasse – Code, Notizen, halbfertige Ideen, private Repos – dann will ich wissen, wo das alles liegt. Nicht "irgendwo in einer Cloud, deren Preismodell sich alle paar Monate ändert", sondern auf einer Platte, die in meinem Flur steht. Das ist keine Paranoia, sondern einfach die Konsequenz daraus, dass ich diese Werkzeuge inzwischen für Dinge nutze, die mir wichtig sind. Selbsthosting ist hier kein Selbstzweck, sondern die logische Antwort auf die Frage "wem gehört das eigentlich, was hier entsteht?".
+
+## Budget ist kein Bauchgefühl, sondern eine Zahl
+
+Der zweite Grund ist banaler, aber im Alltag wichtiger: Kosten. Wenn ein Agent im Hintergrund läuft und ich nicht bei jedem Tool-Call daneben sitze, will ich nicht raten müssen, was mich das gerade kostet. Deshalb pflege ich in meinem Setup eine `pricing.yaml`, die für jedes verwendete Modell den Preis pro eine Million Input- und Output-Tokens hinterlegt – als aktuell konfiguriertes Standardmodell läuft bei mir `claude-sonnet-4-6`. Das ist keine Schätzung im Nachhinein, sondern eine feste Tabelle, gegen die jeder Run gerechnet wird.
+
+Der eigentliche Trick liegt aber nicht in der Preistabelle, sondern darin, wo die Verbrauchszahlen herkommen: Mein Daemon liest sie nicht aus irgendeiner Zusammenfassung, sondern direkt aus dem Transcript der laufenden Session – in einer Funktion, die ich `_cost_from_usage` genannt habe. Das bedeutet: Die Kosten pro Run sind live berechenbar, aus echten Token-Zahlen, nicht aus Bauchgefühl. Wie knifflig das im Detail werden kann – Stichwort Cache-Reads, die man leicht doppelt zählt – erzähle ich in Teil 4, wo mir genau das einmal ordentlich um die Ohren geflogen ist.
+
+<Callout type="info">
+Dieser Blog hier läuft bewusst auf Vercel und nicht auf meinem NUC. Der Grund ist simpel: Der Blog soll öffentlich erreichbar sein, unabhängig davon, was bei mir zuhause gerade los ist – ob der NUC neu startet, ein Agent gerade die Platte volllaufen lässt, oder ich mitten in einem Experiment den Daemon neu deploye. Öffentliche Erreichbarkeit und privates Experimentieren sind zwei verschiedene Anforderungen, und ich behandle sie auch als zwei verschiedene Maschinen.
+</Callout>
+
+## Netzwerk-Posture: nie offen ins Internet
+
+Der dritte Grund ist eine Grundregel, die durch die ganze Serie zieht: Mein Daemon – das kleine FastAPI-Programm, das Claude-Agenten startet und überwacht – bindet ausschließlich an `127.0.0.1`. Niemals an `0.0.0.0`. Erreichbar ist er nur über Loopback oder über Tailscale, mein privates Netz zwischen NUC, GPU-Rechner und Laptop (dazu mehr in Teil 3). Es gibt keinen Port, der offen ins öffentliche Internet zeigt. Das ist kein nachträglich aufgesetztes Sicherheitskonzept, sondern eine Entscheidung, die ich von Anfang an in die Architektur eingebaut habe, weil sie sich im Nachhinein viel schwerer reparieren lässt als von vorne mitzudenken.
+
+## Strom sparen, weil GPU-Leistung nicht kostenlos ist
+
+Der vierte Grund ist pragmatisch: Strom. Meine GPU steckt nicht im NUC – dazu gleich mehr –, sondern in einer separaten Maschine mit einer RTX 3090. Die läuft nicht rund um die Uhr. Sie wird nur bei Bedarf geweckt, arbeitet ihren Job ab, und legt sich danach selbst wieder schlafen. Dieses Verhalten – Wake-on-Demand plus Self-Suspend – ist in einer Spezifikation dokumentiert, die ich `SPEC_remote_comfyui.md` genannt habe. Der Grundgedanke dort: Eine 3090 unter Volllast zieht spürbar Strom, und die allermeiste Zeit tut sie schlicht nichts. Warum sie dann laufen lassen? In Teil 6 zeige ich, wie genau dieses Aufwecken und Wieder-Einschlafen technisch funktioniert.
+
+## Kein Chef-Agent, sondern ein deterministischer Daemon
+
+Und der letzte Grund, warum das Ganze überhaupt so gebaut ist, wie es ist: Ich wollte keine KI, die eine andere KI beaufsichtigt. Kein "Meta-Agent", der entscheidet, ob ein Lauf gut war oder abgebrochen werden muss. Stattdessen übernimmt das ein ganz gewöhnlicher, deterministischer Daemon – ein Programm, das Regeln stur durchzieht: Budget aufgebraucht? Stoppen. Job fertig? Ergebnis ablegen. Kein Ermessensspielraum, keine Überraschungen. Das mag unspektakulär klingen, ist aber genau der Punkt: Ich will nicht einer KI vertrauen müssen, die eine andere KI überwacht. Ich will mich auf Code verlassen können, der genau das tut, was in ihm steht.
+
+## Was als Nächstes kommt
+
+Diese fünf Gründe – Datenhoheit, Budgetkontrolle, Netzwerk-Disziplin, Stromsparen und ein deterministischer statt ein "intelligenter" Aufseher – sind der rote Faden durch die ganze Serie. In Teil 2 geht es handfest los: Ich baue das Fundament, einen unscheinbaren NUC, der rund um die Uhr läuft, aber selbst nie eine GPU-Last trägt. Von dort aus wächst der Rest des Setups Stück für Stück.
