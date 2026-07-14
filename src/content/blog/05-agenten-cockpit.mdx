@@ -1,0 +1,91 @@
+---
+title: "Teil 5: Claude-Agenten & Cockpit"
+part: 5
+slug: "claude-agenten-cockpit"
+summary: "Wie aus einzelnen Claude-Code-Jobs ein System wird: ein append-only Event-Log als Wahrheitsquelle, eine schlanke FastAPI, Worktree-Isolation pro Agent – und zwei sehr unterschiedliche Cockpits, um alles zu beobachten und zu steuern."
+date: "2026-07-13"
+readingTime: "9 min"
+tags: ["Claude Code", "FastAPI", "Architektur", "TUI"]
+---
+
+Ein einzelner Hintergrund-Job, wie in Teil 4 beschrieben, ist überschaubar. Sobald aber mehrere Agenten parallel an verschiedenen Aufgaben arbeiten, brauche ich etwas, das den Überblick behält: einen zentralen Zustand, eine API, über die ich Aktionen auslösen kann, und ein Cockpit, das mir zeigt, was gerade passiert. Das ist der Teil der Serie, in dem aus einzelnen Kommandos ein System wird.
+
+## Ein Event-Log als einzige Wahrheitsquelle
+
+Das Fundament ist bewusst simpel gehalten: ein append-only Event-Log. Jede Zustandsänderung – ein Job startet, ein Run wird gemerged, ein Budget läuft aus – wird als Event angehängt, nie verändert oder gelöscht. In meinem Code sind die Bausteine sauber getrennt: `events.py` führt das eigentliche Log, `projection.py` faltet die Events zu einem aktuellen Zustand zusammen (Fold), `triage.py` filtert daraus das heraus, was gerade wirklich meine Aufmerksamkeit braucht, und `model.py` definiert die Kernobjekte – allen voran `Run` und `Balance`.
+
+Der Vorteil eines append-only Logs: Ich kann jederzeit rekonstruieren, wie ein Zustand entstanden ist, indem ich einfach von vorne durch die Events falte. Es gibt keinen separaten "aktuellen Zustand", der aus dem Ruder laufen könnte – der Zustand ist immer nur die Projektion der bisherigen Events.
+
+## Die API: FastAPI auf 127.0.0.1:7430
+
+Darüber liegt eine schlanke FastAPI-Anwendung (`daemon/main.py`), die – wie schon in Teil 2 und 3 beschrieben – ausschließlich auf `127.0.0.1:7430` lauscht. Die Kernrouten sind bewusst schmal:
+
+- `GET /healthz` – Lebenszeichen
+- `GET /runs` – alle Runs
+- `GET /runs/{id}` – ein einzelner Run
+- `GET /repos` – bekannte Repositories
+- `POST /spawn` – einen neuen Agentenlauf starten
+- `GET /events` / `POST /events` – das Event-Log lesen bzw. schreiben
+
+## Action-Routen, die tatsächlich existieren
+
+Neben dem reinen Lesen gibt es in `daemon/routes/runs.py` eine Reihe von Action-Routen, die echte Eingriffe erlauben:
+
+```bash title="Beispiele für Action-Routen"
+POST /runs/{id}/merge
+POST /runs/{id}/discard
+POST /runs/{id}/redispatch
+POST /runs/{id}/gc
+POST /runs/{id}/respond
+```
+
+Jede dieser Routen tut im Kern dasselbe Muster: Sie emittiert ein `*_requested`-Event ins Log und ruft die passende `watcher.handle_*`-Funktion auf, die die eigentliche Arbeit erledigt – einen Branch mergen, einen Run verwerfen, einen fehlgeschlagenen Lauf neu starten, aufräumen, oder eine Rückfrage des Agenten beantworten.
+
+<Callout type="tip">
+Code schlägt Docs: In meiner eigenen `API.md` (Stand 2026-06-29) steht noch, dass genau diese Action-Routen und die `since_seq`-Query fehlen würden. Beides existiert im aktuellen Code längst. Für diese Serie habe ich mich an den Code gehalten, nicht an die (veraltete) Dokumentation – ein gutes Beispiel dafür, warum man bei sowas immer nachsieht statt sich auf die Doku zu verlassen.
+</Callout>
+
+## Wie Clients neue Events bekommen
+
+Es gibt kein Server-Sent-Events- oder Websocket-Protokoll in diesem System – bewusst nicht. Stattdessen fragen Clients regelmäßig nach: `GET /events?since=<timestamp>` oder `GET /events?since_seq=<int>`. Beide Cockpits, die ich gleich vorstelle, pollen auf diese Weise in einem Rhythmus von ein bis zwei Sekunden. Das ist weniger elegant als ein Push-Mechanismus, aber deutlich einfacher zu debuggen und robuster gegenüber Verbindungsabbrüchen über Tailscale-Tunnel.
+
+## Worktree-Isolation pro Agent
+
+Damit mehrere Agenten nicht gegenseitig ihre Änderungen überschreiben, bekommt jeder Lauf ein eigenes Git-Worktree:
+
+```bash title="Worktree pro Agent"
+git worktree add -b agent/<slug> .worktrees/<branch> <base>
+```
+
+Der `<slug>` wird aus dem Aufgabennamen abgeleitet (slugifiziert), und bei Namenskollisionen hängt mein Code automatisch einen Suffix an. Eine Funktion namens `_validate_ref_name` prüft vorher, dass der resultierende Branch-Name ein gültiger Git-Ref ist. Welche Repositories dafür überhaupt zur Verfügung stehen, steht in einer zentralen `config/registry.yaml`.
+
+## Zwei Cockpits, zwei Philosophien
+
+Um das alles zu beobachten und zu steuern, habe ich zwei komplett unterschiedliche Cockpits gebaut.
+
+Das erste ist eine Textual-TUI – ein Terminal-Interface mit echten Aktionen. Installiert wird es klassisch:
+
+```bash title="TUI installieren und starten"
+pip install -e .
+agent-tui
+```
+
+Das Entry-Point ist in meiner `pyproject.toml` als `agent-tui = "tui.app:main"` eingetragen. Im Hintergrund pollt ein Modul namens `tui/poller.py` alle zwei Sekunden `GET /runs`. Die Bedienung läuft über einzelne Tasten: `m` für merge, `d` für discard, `r` für redispatch, `g` für gc, `a` um alle anzuzeigen, `q` zum Beenden.
+
+Für den Fernzugriff gibt es einen Launcher (`bin/agent-cockpit`), den ich per SSH remote starte und in einer `tmux`-Session am Leben halte:
+
+```bash title="TUI remote starten"
+ssh -t uli@nuc "~/agent-daemon/bin/agent-cockpit"
+```
+
+Läuft die Sitzung einmal in `tmux`, kann ich sie mit `tmux attach -t agent-tui` jederzeit wieder aufnehmen, egal von welchem Gerät aus ich mich einwähle.
+
+Das zweite Cockpit ist eine Flutter-App namens `agent_cockpit` – aber mit einer ganz anderen Rolle. Sie ist bewusst ein reiner Leser, ohne eigenen Zustand. Sie pollt `GET /events` alle 1500 Millisekunden und zeigt an, was passiert, kann aber nichts auslösen. Das ist keine Einschränkung aus Zeitmangel, sondern Absicht: In `http_actuation_channel.dart` wirft jede Aktionsmethode bewusst einen `UnimplementedError`. Die App ist read-only, mit voller Absicht – ich wollte ein Gerät haben, auf dem ich schnell mal reinschauen kann, ohne die Gefahr, versehentlich vom Handy aus einen Run zu mergen oder zu verwerfen.
+
+## Zwei Werkzeuge für zwei Situationen
+
+Am Schreibtisch, mit Tastatur und Terminal, nutze ich die Textual-TUI – dort will ich aktiv eingreifen können. Unterwegs, auf dem Handy, reicht mir der reine Lesezugriff der Flutter-App völlig, und die fehlende Aktionsmöglichkeit fühlt sich eher wie ein Sicherheitsnetz an als wie eine Einschränkung.
+
+## Ausblick
+
+Damit steht das komplette Orchestrierungs-System: Event-Log, API, Worktree-Isolation, zwei Cockpits. Was bisher fehlt, ist der Teil, für den ich das alles ursprünglich gebaut habe – Bildgenerierung auf einer echten GPU. In Teil 6 zeige ich, wie ich ComfyUI auf der separaten 3090-Maschine von Claude aus ansteuere, inklusive einem Bug, der mich fast eine ganze Nacht gekostet hat: CUDA, das nach einem Suspend tot ist, obwohl alle Health-Checks grün leuchten.
