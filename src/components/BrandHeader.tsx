@@ -42,6 +42,9 @@ export function BrandHeader() {
           <Link href="/updates" className="hover:text-white transition">
             Devlog
           </Link>
+          <Link href="/blog" className="hover:text-white transition">
+            Blog
+          </Link>
 
           {/* Participation */}
           <Link
