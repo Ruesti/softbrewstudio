@@ -1,0 +1,82 @@
+---
+title: "Teil 2: Der NUC als Fundament"
+part: 2
+slug: "nuc-fundament"
+summary: "Wie ich einen unscheinbaren Intel NUC zum always-on Relay meines Setups gemacht habe – Hostname, Systemd-Service für den Daemon und ein kleines Wake-Tool, alles ohne eigene GPU-Last."
+date: "2026-07-13"
+readingTime: "7 min"
+tags: ["Homelab", "Linux", "systemd", "NUC"]
+---
+
+Bevor irgendein Agent irgendetwas tut, braucht es eine Maschine, die einfach immer läuft. Keine Grafikkarte, keine besondere Leistung – nur Verlässlichkeit. Bei mir übernimmt das ein alter Intel NUC5i5RYB. Kein Tippfehler: der hat keine eigene dedizierte GPU. Das ist auch genau der Punkt. Dieser Rechner soll nichts rechnen, was Grafikleistung braucht – dafür gibt es später eine separate Maschine mit einer RTX 3090 (Teil 6). Der NUC ist der Concierge, nicht der Arbeiter.
+
+## Warum überhaupt ein NUC
+
+Ich wollte eine Maschine, die 24/7 läuft, wenig Strom zieht und trotzdem genug Rechenleistung hat, um einen kleinen FastAPI-Daemon, SSH-Zugänge und ein bisschen Orchestrierung zu stemmen. Ein Intel NUC ist dafür fast schon die klassische Wahl: klein, leise, günstig im Betrieb. Er macht selbst nie GPU-Arbeit – wenn ein Agent Bilder generieren oder ein Modell trainieren soll, wird das an die GPU-Box im selben LAN delegiert. Der NUC bleibt der always-on-Relay, der alles am Laufen hält, während die GPU-Maschine nur bei Bedarf aufwacht.
+
+## Erste Schritte: Hostname und /etc/hosts
+
+Der erste handfeste Schritt war, dem Rechner einen Namen zu geben, der in der ganzen Serie wiederkehrt: `nuc`.
+
+```bash title="Hostname setzen"
+sudo hostnamectl set-hostname nuc
+```
+
+Danach musste ich noch den Eintrag in `/etc/hosts` nachziehen, weil der ursprüngliche Eintrag noch den alten Nutzer-basierten Hostnamen enthielt:
+
+```bash title="/etc/hosts anpassen"
+sudo sed -i 's/uli\.nuc uli/nuc.nuc nuc/' /etc/hosts
+```
+
+Klein, aber wichtig: Ohne diesen Zweizeiler hätte ich später ständig Verwirrung zwischen dem lokalen Hostnamen und dem Namen gehabt, unter dem die Maschine im Tailscale-Netz (Teil 3) erreichbar ist.
+
+<Callout type="warn">
+In automatisierten Sessions – etwa wenn ein Agent selbst am NUC arbeitet – steht kein `sudo` zur Verfügung. Alle privilegierten Schritte wie die beiden oben mache ich als Mensch selbst, per Hand, am Gerät oder per SSH mit meinem eigenen Passwort. Kein Agent bekommt Root.
+</Callout>
+
+## Der Daemon als systemd-Service
+
+Das Herzstück auf dem NUC ist ein kleiner Python-Daemon, der Claude-Agenten startet, überwacht und ihren Zustand verwaltet (mehr dazu in Teil 4 und 5). Damit er einen Neustart des NUC übersteht und sich selbst wieder hochzieht, läuft er als systemd-Unit:
+
+```ini title="/etc/systemd/system/agent-daemon.service"
+[Unit]
+Description=Agent Daemon
+After=network.target
+
+[Service]
+ExecStart=/home/uli/agent-daemon/.venv/bin/uvicorn daemon.main:app --host 127.0.0.1 --port 7430
+Restart=always
+User=uli
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Zwei Details hier sind kein Zufall. Erstens: `--host 127.0.0.1` – der Daemon bindet nur an Loopback, nie an `0.0.0.0`. Das ist dieselbe Netzwerk-Posture, die ich in Teil 1 schon angesprochen habe, und sie zieht sich durch die gesamte Serie. Zweitens: `Restart=always` – stürzt der Prozess ab, holt systemd ihn zurück, ohne dass ich eingreifen muss.
+
+Installiert wird die Unit-Datei mit den üblichen zwei Handgriffen:
+
+```bash title="Service installieren und starten"
+sudo cp agent-daemon.service /etc/systemd/system/
+sudo systemctl enable --now agent-daemon
+```
+
+`enable --now` sorgt dafür, dass der Service sofort startet und beim nächsten Boot automatisch wieder hochkommt. Von diesem Moment an läuft der Daemon dauerhaft im Hintergrund, ohne dass ich ihn manuell starten oder überwachen muss.
+
+## Ein kleines Werkzeug: wakegpu
+
+Weil die GPU-Box nicht durchläuft, sondern erst bei Bedarf geweckt wird (mehr dazu in Teil 6 und 7), braucht der NUC ein Werkzeug, das dieses Aufwecken anstößt. Bei mir ist das ein kleines Binary namens `wakegpu`, das ich systemweit verfügbar gemacht habe:
+
+```bash title="wakegpu installieren"
+sudo install -m 0755 wakegpu /usr/local/bin/wakegpu
+```
+
+`install -m 0755` kopiert die Datei und setzt gleichzeitig die richtigen Rechte – ausführbar für alle, schreibbar nur für den Besitzer. Damit kann ich später von überall im Netz aus `wakegpu` aufrufen, ohne mir Gedanken über Pfade oder Berechtigungen machen zu müssen. Wie genau das Wecken über Tailscale und ein Magic Packet funktioniert, zeige ich in Teil 7.
+
+<Callout type="info">
+Zur Hardware selbst: Es handelt sich um einen Intel NUC5i5RYB ohne eigene dedizierte Grafikeinheit – das habe ich vor der Veröffentlichung extra gegen meine Hardware-Unterlagen geprüft, weil es in keinem der Repos dokumentiert war. Genau deshalb läuft jede GPU-Last auf der separaten 3090-Maschine, nie auf diesem Rechner.
+</Callout>
+
+## Was jetzt schon steht
+
+Mit Hostname, systemd-Service und `wakegpu` hat der NUC alles, was er braucht, um als Fundament zu funktionieren: Er ist eindeutig benennbar, sein wichtigster Prozess übersteht Neustarts und Abstürze automatisch, und er hat ein Werkzeug, um die GPU-Maschine bei Bedarf aus dem Schlaf zu holen. Was noch fehlt, ist der Weg, wie ich von meinem Laptop oder Handy überhaupt an diesen NUC herankomme, ohne einen Port ins offene Internet zu hängen. Genau darum geht es in Teil 3: Tailscale als privates Netz zwischen allen meinen Geräten.
