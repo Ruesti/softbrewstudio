@@ -2,40 +2,40 @@
 title: "Teil 6: ComfyUI von Claude gesteuert"
 part: 6
 slug: "comfyui-von-claude"
-summary: "Wie ein Claude-Agent auf dem NUC eine schlafende RTX-3090-Maschine weckt, über ComfyUIs HTTP-API Bilder und Videos generiert und die Box danach wieder selbst suspendet – plus ein fieser CUDA-Bug, der erst nach dem Aufwecken sichtbar wird."
+summary: "Wie ein Claude-Agent auf dem NUC eine schlafende Grafikkarten-Maschine weckt, darüber Bilder und Videos generiert und die Maschine danach wieder selbst schlafen legt – plus ein fieser Grafikkarten-Bug, der erst nach dem Aufwecken sichtbar wird."
 date: "2026-07-13"
-readingTime: "10 min"
+readingTime: "9 min"
 tags: ["ComfyUI", "GPU", "CUDA", "Automation"]
 ---
 
-Alles bisher Beschriebene – NUC, Tailscale, Daemon, Cockpit – ist Orchestrierung. Jetzt kommt der Teil, für den ich das eigentlich gebaut habe: eine echte GPU, die auf Zuruf Bilder und Videos generiert, und dann wieder einschläft, ohne dass ich manuell eingreifen muss.
+Alles bisher Beschriebene – NUC, Tailscale, Daemon, Cockpit – ist reine Organisation im Hintergrund. Jetzt kommt der Teil, für den ich das eigentlich gebaut habe: eine echte Grafikkarte, die auf Zuruf Bilder und Videos generiert und sich danach wieder schlafen legt, ohne dass ich manuell eingreifen muss.
 
-## Die GPU-Maschine: ComfyUI auf pc
+## Die Grafikkarten-Maschine: ComfyUI auf pc
 
-Meine RTX 3090 steckt in einer separaten Maschine, die ich im Tailnet `pc` nenne (Teil 3). Dort läuft ComfyUI, installiert über `~/ComfyUI-Easy-Install/.../ComfyUI`, als systemd-Service:
+Meine RTX 3090 (eine leistungsstarke Grafikkarte) steckt in einer separaten Maschine, die ich im Tailscale-Netz `pc` nenne (Teil 3). Dort läuft ComfyUI – ein Programm zur Bild- und Videogenerierung mit KI-Modellen –, installiert unter `~/ComfyUI-Easy-Install/.../ComfyUI`, als systemd-Dienst (also ebenfalls unter der Aufsicht des "Hausmeisters" aus Teil 2, der es automatisch am Laufen hält):
 
 ```ini title="gpu-box/comfyui.service"
 [Service]
 ExecStart=/home/uli/ComfyUI-Easy-Install/ComfyUI/.venv/bin/python main.py --listen 0.0.0.0
 ```
 
-`--listen 0.0.0.0` mag im Vergleich zur Loopback-Regel des Daemons (Teil 2) erst mal seltsam aussehen – aber diese Maschine hat keine öffentliche IP und ist nur innerhalb meines Tailnet erreichbar. Über Tailscale spreche ich sie schlicht als `http://pc:8188` an.
+`--listen 0.0.0.0` bedeutet, dass das Programm hier auf allen Netzwerk-Adressen der Maschine lauscht, nicht nur auf sich selbst – im Vergleich zur Loopback-Regel des Daemons aus Teil 2 mag das erst mal seltsam aussehen. Aber diese Maschine hat keine öffentliche Adresse und ist nur innerhalb meines privaten Tailscale-Netzes erreichbar. Über Tailscale spreche ich sie schlicht als `http://pc:8188` an.
 
 ## Zwei Wege, wie Claude ComfyUI ansteuert
 
-Für die eigentliche Steuerung habe ich mir zwei Claude-Code-Slash-Commands gebaut, beide unter `~/.claude/commands/` abgelegt, aber mit unterschiedlicher Philosophie.
+Für die eigentliche Steuerung habe ich mir zwei kurze Zusatzbefehle für Claude Code gebaut (sogenannte "Slash-Commands", weil man sie mit einem Schrägstrich eintippt), beide unter `~/.claude/commands/` abgelegt, aber mit unterschiedlicher Philosophie.
 
-`/gpu-run` ist der Batch-Weg: ich gebe einen Workflow-Namen an, und ein Skript kümmert sich um alles – Wecken, Job abschicken, Ergebnis abholen, Maschine wieder schlafen legen:
+`/gpu-run` ist der Rundum-sorglos-Weg: Ich gebe einen Workflow-Namen an, und ein Skript kümmert sich um alles – Aufwecken, Auftrag abschicken, Ergebnis abholen, Maschine wieder schlafen legen:
 
-```bash title="Batch-Lauf über /gpu-run"
+```bash title="Rundum-sorglos-Lauf über /gpu-run"
 ~/gpu-run.sh sdxl_api
 ```
 
-`/comfy` dagegen ist der konversationelle Weg: Claude spricht direkt und interaktiv über HTTP mit der ComfyUI-API, über ein Hilfsskript `~/comfy-api.sh`, wenn ich zum Beispiel einen Prompt mehrfach anpassen will, bevor ich zufrieden bin.
+`/comfy` dagegen ist der Weg für den Dialog: Claude spricht direkt und interaktiv über eine Programmierschnittstelle (API) mit ComfyUI, über ein Hilfsskript `~/comfy-api.sh` – praktisch, wenn ich zum Beispiel einen Text-Prompt mehrfach anpassen will, bevor ich zufrieden bin.
 
-## Die ComfyUI-API im Detail
+## Die ComfyUI-Schnittstelle im Detail
 
-Die eigentliche Steuerung läuft über eine Handvoll HTTP-Endpunkte, die ComfyUI selbst mitbringt.
+Die eigentliche Steuerung läuft über eine Handvoll Web-Adressen (HTTP-Endpunkte), die ComfyUI selbst mitbringt. Ich rufe sie mit `curl` auf, einem Kommandozeilen-Werkzeug, mit dem man Web-Adressen direkt aus dem Terminal abfragen kann.
 
 Zuerst die Frage, ob die Maschine überhaupt bereit ist:
 
@@ -43,7 +43,7 @@ Zuerst die Frage, ob die Maschine überhaupt bereit ist:
 curl http://pc:8188/system_stats
 ```
 
-Dann der eigentliche Job:
+Dann der eigentliche Auftrag:
 
 ```bash title="Workflow einreichen"
 curl -X POST http://pc:8188/prompt \
@@ -51,49 +51,49 @@ curl -X POST http://pc:8188/prompt \
   -d '{"prompt": <workflow-json>, "client_id": "claude-code"}'
 ```
 
-Die Antwort liefert eine `prompt_id` – oder, im Fehlerfall, `node_errors` mit Details, welcher Knoten im Workflow nicht funktioniert. Mit der `prompt_id` frage ich anschließend den Fortschritt ab:
+Die Antwort liefert eine Auftrags-Kennung (`prompt_id`) – oder, im Fehlerfall, Details dazu, welcher Baustein im Workflow nicht funktioniert hat (`node_errors`). Mit dieser Kennung frage ich anschließend den Fortschritt ab:
 
 ```bash title="Status abfragen"
 curl http://pc:8188/history/<prompt_id>
 ```
 
-Ich prüfe darin das Feld `status.completed`, um zu wissen, ob der Job fertig ist. Ist er das, hole ich das Ergebnis:
+Ich prüfe darin das Feld `status.completed`, um zu wissen, ob der Auftrag fertig ist. Ist er das, hole ich das Ergebnis:
 
 ```bash title="Ergebnis abholen"
 curl "http://pc:8188/view?filename=<name>&subfolder=<sub>&type=output"
 ```
 
-Für Debugging oder um herauszufinden, welche Node-Typen und Parameter überhaupt zur Verfügung stehen, gibt es außerdem `GET /object_info` bzw. `GET /object_info/<NodeType>` für einen einzelnen Knotentyp.
+Für die Fehlersuche oder um herauszufinden, welche Bausteine und Einstellungen ComfyUI überhaupt anbietet, gibt es außerdem `GET /object_info` bzw. `GET /object_info/<NodeType>` für einen einzelnen Baustein-Typ.
 
-## Vier Workflow-Vorlagen
+## Vier Vorlagen für unterschiedliche Zwecke
 
-Ich pflege eine kleine Sammlung von Workflow-JSONs, jede für einen anderen Zweck:
+Ich pflege eine kleine Sammlung von Workflow-Vorlagen (jeweils als JSON-Datei, ein weit verbreitetes Format zum Speichern strukturierter Daten), jede für einen anderen Zweck:
 
-- `sdxl_api.json` – SDXL, 1024×1024
-- `dreamshaper_api.json` – SD1.5-basiert
+- `sdxl_api.json` – SDXL, 1024×1024 Bildpunkte
+- `dreamshaper_api.json` – auf SD1.5 basierend
 - `ltxv_api.json` – Video-Generierung
-- `test_pipeline_api.json` – ein minimaler CPU-Smoke-Test, um die Pipeline ohne echte GPU-Last zu prüfen
+- `test_pipeline_api.json` – ein minimaler Testlauf ohne Grafikkarten-Beteiligung, um den Ablauf ohne echte Rechenlast zu prüfen
 
-Den eigentlichen Prompt-Text injiziere ich nicht durch Editieren der ganzen JSON-Datei von Hand, sondern gezielt in den einen Node, dessen `_meta.title` gleich `"PROMPT"` ist – mit `jq` als Werkzeug, um das JSON chirurgisch zu verändern, statt die ganze Struktur neu zu bauen.
+Den eigentlichen Prompt-Text trage ich dabei nicht durch Editieren der ganzen Datei von Hand ein, sondern gezielt an genau der Stelle, deren Titel `"PROMPT"` heißt – mit dem Werkzeug `jq`, das gezielt einzelne Werte in solchen Dateien ändert, statt die ganze Struktur neu bauen zu müssen.
 
-## Der Ablauf: Wake, Job, Taildrop, Self-Suspend
+## Der Ablauf: Aufwecken, Auftrag, Versand, Wieder-Einschlafen
 
-Der typische Ablauf eines `/gpu-run`-Aufrufs sieht so aus: Wake (die Maschine wird per Magic Packet geweckt, siehe Teil 7) → Job (der Workflow wird über die API oben abgeschickt und abgewartet) → Taildrop (das Ergebnis wird automatisch an mein Zielgerät geschickt) → Self-Suspend (die Maschine legt sich danach selbst wieder schlafen).
+Der typische Ablauf eines `/gpu-run`-Aufrufs sieht so aus: Aufwecken (die Maschine wird per Magic Packet geweckt, ein spezielles Weck-Signal übers Netzwerk, siehe Teil 7) → Auftrag (der Workflow wird über die Schnittstelle oben abgeschickt und abgewartet) → Versand (das Ergebnis wird automatisch per Taildrop an mein Zielgerät geschickt, Tailscales eingebaute Dateiversand-Funktion) → Wieder-Einschlafen (die Maschine legt sich danach selbst wieder in den Schlafmodus).
 
-Das Self-Suspend ist dabei kein blindes "immer nach dem Job schlafen", sondern hat ein eingebautes Fail-safe: Die Box suspendet nur (via `sudo systemctl suspend`, erlaubt durch einen NOPASSWD-Eintrag in den sudoers speziell für diesen Befehl), wenn sowohl der Job erfolgreich durchgelaufen ist als auch der Taildrop-Transfer geklappt hat. Ist eine der beiden Bedingungen nicht erfüllt, bleibt die Maschine einfach an, und der Grund dafür landet im Log. Lieber eine Nacht lang unnötig Strom ziehen als ein Ergebnis verlieren, das ich nie bekommen habe.
+Das Wieder-Einschlafen ist dabei kein blindes "immer nach dem Auftrag schlafen", sondern hat eine eingebaute Sicherung: Die Maschine legt sich nur schlafen (per `sudo systemctl suspend`, erlaubt durch einen speziellen Eintrag in den Systemrechten genau für diesen einen Befehl, ohne dass dafür ein Passwort nötig ist), wenn sowohl der Auftrag erfolgreich durchgelaufen ist als auch der Dateiversand geklappt hat. Ist eine der beiden Bedingungen nicht erfüllt, bleibt die Maschine einfach an, und der Grund dafür landet im Protokoll. Lieber eine Nacht lang unnötig Strom ziehen als ein Ergebnis verlieren, das ich nie bekommen habe.
 
-## Der CUDA-Bug, der mich am meisten gekostet hat
+## Der Grafikkarten-Bug, der mich am meisten gekostet hat
 
-Der unangenehmste Fehler in der ganzen Serie war dieser: Nach einem Suspend (S3) meldeten `nvidia-smi` und sogar ComfyUIs eigener `/system_stats`-Endpunkt eine vollkommen gesunde GPU. Trotzdem schlug jeder tatsächliche Generierungs-Job fehl. Der Grund: Das `nvidia_uvm`-Kernelmodul übersteht einen S3-Suspend nicht sauber – CUDA ist nach dem Aufwachen faktisch tot, obwohl alle oberflächlichen Health-Checks grün leuchten.
+Der unangenehmste Fehler in der ganzen Serie war dieser: Nach dem Schlafmodus (dem sogenannten S3-Suspend, einem besonders tiefen Energiesparmodus) meldeten sowohl das Diagnose-Werkzeug `nvidia-smi` als auch ComfyUIs eigener Gesundheitscheck (`/system_stats`) eine vollkommen gesunde Grafikkarte. Trotzdem schlug jeder tatsächliche Generierungs-Auftrag fehl. Der Grund: Ein bestimmter Systembaustein für die Grafikkarte (`nvidia_uvm`) übersteht einen solchen tiefen Schlafmodus nicht sauber – die Grafikkarten-Software CUDA ist nach dem Aufwachen faktisch tot, obwohl alle oberflächlichen Gesundheitschecks grün leuchten.
 
 <Callout type="warn">
-`nvidia_uvm` überlebt keinen S3-Suspend. CUDA ist nach dem Resume kaputt, obwohl `nvidia-smi` und `/system_stats` beide behaupten, alles sei in Ordnung – ein Health-Check, der genau in dem Moment lügt, in dem man ihm am meisten vertrauen will. Meine Lösung: ein `nvidia-uvm-reload.service`, der das Kernelmodul beim Resume sauber neu lädt, kombiniert mit einem frischen `torch.cuda.is_available()`-Check direkt zu Beginn von `run-and-sleep.sh` – bevor überhaupt ein echter Job losgeschickt wird.
+Der Systembaustein `nvidia_uvm` überlebt keinen tiefen Schlafmodus (S3-Suspend). Die Grafikkarten-Software CUDA ist danach kaputt, obwohl `nvidia-smi` und `/system_stats` beide behaupten, alles sei in Ordnung – ein Gesundheitscheck, der genau in dem Moment lügt, in dem man ihm am meisten vertrauen will. Meine Lösung: ein eigener Dienst (`nvidia-uvm-reload.service`), der diesen Baustein beim Aufwachen sauber neu lädt, kombiniert mit einem frischen Test direkt zu Beginn von `run-and-sleep.sh` – bevor überhaupt ein echter Auftrag losgeschickt wird.
 </Callout>
 
-Ohne diesen doppelten Schutz – Modul-Reload plus Vorabcheck – hätte ich wahrscheinlich zahlreiche Nächte mit "erfolgreich aufgewacht, Job trotzdem gescheitert" verbracht, ohne die Ursache zu erkennen.
+Ohne diesen doppelten Schutz – Neuladen des Bausteins plus Vorabcheck – hätte ich wahrscheinlich zahlreiche Nächte mit "erfolgreich aufgewacht, Auftrag trotzdem gescheitert" verbracht, ohne die Ursache zu erkennen.
 
 <Callout type="info">
-Wichtig für die Architektur: Der orchestrierende Agent selbst läuft immer auf dem NUC, nie auf der GPU-Box. Der Grund ist naheliegend, wenn man ihn einmal ausgesprochen hat: Würde der Agent auf der Maschine laufen, die er gerade testweise herunterfährt, würde er sich beim Auto-Shutdown-Test selbst aussperren.
+Wichtig für den Aufbau: Der steuernde Agent selbst läuft immer auf dem NUC, nie auf der Grafikkarten-Maschine. Der Grund ist naheliegend, wenn man ihn einmal ausgesprochen hat: Würde der Agent auf der Maschine laufen, die er gerade testweise herunterfährt, würde er sich beim Test des automatischen Herunterfahrens selbst aussperren.
 </Callout>
 
 ## Ausblick
