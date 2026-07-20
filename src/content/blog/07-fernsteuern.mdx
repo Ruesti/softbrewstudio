@@ -2,49 +2,49 @@
 title: "Teil 7: Von Laptop & Handy fernsteuern"
 part: 7
 slug: "fernsteuern-laptop-handy"
-summary: "Der Abschluss der Serie: wie ich die schlafende GPU-Maschine von überall aus wecke, Ergebnisse automatisch per Taildrop auf Laptop und Handy bekomme – und wie ich das ganze Setup auch unterwegs im Blick behalte."
+summary: "Der Abschluss der Serie: wie ich die schlafende Grafikkarten-Maschine von überall aus wecke, Ergebnisse automatisch auf Laptop und Handy bekomme – und das ganze Setup auch unterwegs im Blick behalte."
 date: "2026-07-13"
-readingTime: "8 min"
+readingTime: "7 min"
 tags: ["Tailscale", "Automation", "Wake-on-LAN", "Homelab"]
 ---
 
-Am Ende dieser Serie steht die Frage, die eigentlich am Anfang stand: Kann ich das alles auch benutzen, wenn ich nicht zuhause bin? Kein Ethernet-Kabel, kein WLAN im eigenen Netz, nur ein Handy im Mobilfunknetz oder ein Laptop im Café. Die Antwort ist ja – aber der Weg dahin braucht einen kleinen Umweg, den ich mir erst erarbeiten musste.
+Am Ende dieser Serie steht die Frage, die eigentlich am Anfang stand: Kann ich das alles auch benutzen, wenn ich nicht zuhause bin? Kein Netzwerkkabel, kein WLAN im eigenen Heimnetz, nur ein Handy im Mobilfunknetz oder ein Laptop im Café. Die Antwort ist ja – aber der Weg dahin braucht einen kleinen Umweg, den ich mir erst erarbeiten musste.
 
-## Warum Wecken aus der Ferne nicht trivial ist
+## Warum Wecken aus der Ferne nicht so einfach ist
 
-Wake-on-LAN funktioniert klassischerweise über sogenannte Magic Packets – spezielle Broadcast-Pakete, die eine schlafende Netzwerkkarte aufwecken. Das Problem: Diese Pakete überqueren keine Subnetzgrenzen und schon gar nicht das Mobilfunknetz. Sitze ich mit dem Handy unterwegs, kann ich kein Magic Packet direkt an meine GPU-Maschine zuhause schicken – das Paket würde nirgendwo ankommen, weil es das lokale LAN nie verlässt.
+Das Aufwecken schlafender Rechner übers Netzwerk (Wake-on-LAN) funktioniert klassischerweise über sogenannte Magic Packets – spezielle Signale, die an alle Geräte im selben Netzwerkabschnitt verschickt werden und eine schlafende Netzwerkkarte aufwecken. Das Problem: Diese Signale überqueren keine Netzwerkgrenzen und schon gar nicht das Mobilfunknetz. Sitze ich mit dem Handy unterwegs, kann ich kein solches Signal direkt an meine Grafikkarten-Maschine zuhause schicken – es würde nirgendwo ankommen, weil es das lokale Heimnetz nie verlässt.
 
 <Callout type="warn">
-Wake-on-LAN-Magic-Packets überqueren keine Subnetzgrenzen und erst recht kein Mobilfunknetz. Genau deshalb brauche ich den Relay-Umweg über den always-on NUC: Er steht im selben LAN wie die GPU-Maschine und kann das Magic Packet lokal zustellen, während ich ihn selbst bequem über Tailscale von überall erreiche.
+Magic Packets zum Wecken übers Netzwerk überqueren keine Netzwerkgrenzen und erst recht kein Mobilfunknetz. Genau deshalb brauche ich den Umweg über den rund um die Uhr laufenden NUC: Er steht im selben Heimnetz wie die Grafikkarten-Maschine und kann das Wecksignal dort lokal zustellen, während ich ihn selbst bequem über Tailscale von überall erreiche.
 </Callout>
 
-Die Lösung ist der NUC aus Teil 2. Er läuft rund um die Uhr im selben LAN wie die GPU-Box und übernimmt das eigentliche Wecken stellvertretend für mich:
+Die Lösung ist der NUC aus Teil 2. Er läuft rund um die Uhr im selben Heimnetz wie die Grafikkarten-Maschine und übernimmt das eigentliche Wecken stellvertretend für mich. Mit diesem einen Befehl stoße ich das von überall aus an:
 
 ```bash title="GPU-Box von überall wecken"
 ssh nuc wakegpu
 ```
 
-Das `wakegpu`-Binary auf dem NUC (Teil 2) kennt die MAC-Adresse der GPU-Maschine – `d8:43:ae:61:f4:b8` – und schickt das Magic Packet lokal im LAN los. Diese MAC-Adresse ist bewusst nur an einer einzigen Stelle im Code hinterlegt, in genau diesem `wakegpu`-Binary, damit ich sie nicht an mehreren Stellen synchron halten muss.
+Das `wakegpu`-Programm auf dem NUC (Teil 2) kennt die feste Geräte-Kennung der Netzwerkkarte der Grafikkarten-Maschine (die sogenannte MAC-Adresse – `d8:43:ae:61:f4:b8`) und schickt das Wecksignal lokal im Heimnetz los. Diese Kennung ist bewusst nur an einer einzigen Stelle im Code hinterlegt, in genau diesem `wakegpu`-Programm, damit ich sie nicht an mehreren Stellen gleichzeitig aktuell halten muss.
 
 ## Das Ein-Kommando-Ritual
 
-Ist die Maschine erst mal wach, reicht ein einziger Befehl, um einen kompletten Generierungslauf anzustoßen – entweder direkt in der Shell oder als Slash-Command in Claude Code selbst:
+Ist die Maschine erst mal wach, reicht ein einziger Befehl, um einen kompletten Generierungslauf anzustoßen – entweder direkt in der Kommandozeile oder als kurzer Zusatzbefehl in Claude Code selbst:
 
 ```bash title="Ein Kommando, ein kompletter Lauf"
 ~/gpu-run.sh sdxl_api
 ```
 
-Oder, wenn ich gerade ohnehin in einer Claude-Code-Session bin:
+Oder, wenn ich gerade ohnehin in einer Claude-Code-Sitzung bin:
 
 ```
 /gpu-run sdxl_api
 ```
 
-Beide Formen lösen denselben Ablauf aus, den ich in Teil 6 beschrieben habe: Wecken, Job abschicken, Ergebnis abholen, Maschine wieder schlafen legen. Für mich als Nutzer bleibt davon nur ein einziger Tastendruck übrig.
+Beide Formen lösen denselben Ablauf aus, den ich in Teil 6 beschrieben habe: Wecken, Auftrag abschicken, Ergebnis abholen, Maschine wieder schlafen legen. Für mich als Nutzer bleibt davon nur ein einziger Tastendruck übrig.
 
 ## Ergebnisse automatisch einsammeln
 
-Das Ergebnis eines Laufs landet über Taildrop auf meinem Laptop. Damit ich es dort nicht manuell abholen muss, läuft ein systemd-User-Timer, der die Taildrop-Inbox regelmäßig leert:
+Das Ergebnis eines Laufs landet über Taildrop – Tailscales eingebaute Dateiversand-Funktion – auf meinem Laptop. Damit ich es dort nicht manuell abholen muss, läuft ein wiederkehrender Hintergrundauftrag (ein systemd-Timer), der den Taildrop-Posteingang regelmäßig leert:
 
 ```ini title="laptop/taildrop-drain.timer"
 [Timer]
@@ -53,13 +53,13 @@ OnUnitActiveSec=2min
 Persistent=true
 ```
 
-Der zugehörige Service ruft im Kern `tailscale file get -conflict=rename ~/taildrop-inbox/` auf – holt also alle wartenden Dateien ab und benennt sie im Kollisionsfall automatisch um, statt sie zu überschreiben. Aktiviert wird der Timer wie jeder andere systemd-User-Timer auch:
+Der zugehörige Dienst ruft im Kern den Befehl `tailscale file get -conflict=rename ~/taildrop-inbox/` auf – holt also alle wartenden Dateien ab und benennt sie im Kollisionsfall automatisch um, statt sie zu überschreiben. Aktiviert wird der wiederkehrende Auftrag wie jeder andere auch, mit einem einzigen Befehl:
 
 ```bash title="Timer aktivieren"
 systemctl --user enable --now taildrop-drain.timer
 ```
 
-`OnBootSec=1min` sorgt dafür, dass die Inbox kurz nach jedem Neustart des Laptops geprüft wird, `OnUnitActiveSec=2min` hält den Rhythmus danach bei zwei Minuten, und `Persistent=true` holt versäumte Läufe nach, falls der Laptop beim geplanten Zeitpunkt ausgeschaltet war.
+`OnBootSec=1min` sorgt dafür, dass der Posteingang kurz nach jedem Neustart des Laptops geprüft wird, `OnUnitActiveSec=2min` hält den Rhythmus danach bei zwei Minuten, und `Persistent=true` holt versäumte Läufe nach, falls der Laptop zum geplanten Zeitpunkt ausgeschaltet war.
 
 Soll ein Ergebnis stattdessen aufs Handy, nutze ich dasselbe Muster, nur mit anderem Ziel:
 
@@ -67,12 +67,12 @@ Soll ein Ergebnis stattdessen aufs Handy, nutze ich dasselbe Muster, nur mit and
 tailscale file cp <datei> <handy-name>:
 ```
 
-## Das Setup von mobil im Blick behalten
+## Das Setup von unterwegs im Blick behalten
 
-Bleibt die Frage: Wie behalte ich unterwegs den Überblick, ohne selbst etwas kaputt machen zu können? Dafür gibt es bei mir im Grunde drei Betriebsarten. Zuhause, direkt am Schreibtisch, spreche ich den Daemon lokal an. Ist der Daemon auf dem NUC aktiv, kann ich mit dem Cockpit aus Teil 5 über Tailscale draufschauen, egal wo ich gerade bin. Und mobil, auf dem Handy, ist die Flutter-App aus Teil 5 einfach ein weiterer Leser – sie holt sich beim Start einen Snapshot des aktuellen Zustands und danach laufend alles Neue über das Event-Log, kann aber nichts auslösen.
+Bleibt die Frage: Wie behalte ich unterwegs den Überblick, ohne selbst etwas kaputt machen zu können? Dafür gibt es bei mir im Grunde drei Betriebsarten. Zuhause, direkt am Schreibtisch, spreche ich den Daemon direkt an. Ist der Daemon auf dem NUC aktiv, kann ich mit dem Cockpit aus Teil 5 über Tailscale draufschauen, egal wo ich gerade bin. Und mobil, auf dem Handy, ist die Flutter-App aus Teil 5 einfach ein weiterer Betrachter – sie holt sich beim Start eine Momentaufnahme des aktuellen Zustands und danach laufend alles Neue aus dem Protokoll, kann aber nichts auslösen.
 
-Den Zugriff auf den loopback-gebundenen Daemon selbst stelle ich dabei je nach Situation auf eine von drei Arten her: über einen SSH-Tunnel (`ssh -L 7430:127.0.0.1:7430 nuc`, siehe Teil 3), über `tailscale serve`, das ich einmal remote aktiviere und dann dauerhaft laufen lasse, oder – wenn ich wirklich in die TUI selbst will – über eine SSH-Sitzung, die ich in `tmux` am Leben halte, so wie in Teil 5 beschrieben.
+Den Zugriff auf den Daemon, der ja nur sich selbst hört, stelle ich dabei je nach Situation auf eine von drei Arten her: über einen SSH-Tunnel (`ssh -L 7430:127.0.0.1:7430 nuc`, siehe Teil 3), über `tailscale serve`, das ich einmal aus der Ferne aktiviere und dann dauerhaft laufen lasse, oder – wenn ich wirklich in die textbasierte Bedienoberfläche selbst will – über eine Fernsitzung, die ich in `tmux` am Leben halte, so wie in Teil 5 beschrieben.
 
 ## Was am Ende steht
 
-Sieben Teile, ein zusammenhängendes System: ein NUC, der nie schläft, ein privates Netz über Tailscale, ein Daemon, der Claude-Agenten headless startet und ihr Budget korrekt zählt, ein Event-Log als Wahrheitsquelle mit zwei sehr unterschiedlichen Cockpits, eine GPU-Maschine, die nur bei Bedarf aufwacht – und ein letztes Stück Klebstoff, das das alles auch von unterwegs erreichbar macht. Nichts davon ist besonders kompliziert für sich genommen. Der eigentliche Wert liegt darin, dass jedes Teil sein eigenes, klar abgegrenztes Problem löst, und dass ich am Ende genau weiß, wo meine Daten liegen, was ein Lauf kostet, und wer eigentlich gerade wacht – nämlich niemand außer einem stur deterministischen Daemon.
+Sieben Teile, ein zusammenhängendes System: ein NUC, der nie schläft, ein privates Netz über Tailscale, ein Daemon, der Claude-Agenten unsichtbar im Hintergrund startet und ihr Budget korrekt zählt, ein Protokoll als Wahrheitsquelle mit zwei sehr unterschiedlichen Cockpits, eine Grafikkarten-Maschine, die nur bei Bedarf aufwacht – und ein letztes Stück Klebstoff, das das alles auch von unterwegs erreichbar macht. Nichts davon ist besonders kompliziert für sich genommen. Der eigentliche Wert liegt darin, dass jedes Teil sein eigenes, klar abgegrenztes Problem löst, und dass ich am Ende genau weiß, wo meine Daten liegen, was ein Lauf kostet, und wer eigentlich gerade wacht – nämlich niemand außer einem stur regelbasierten Daemon.
