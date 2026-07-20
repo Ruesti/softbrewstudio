@@ -2,36 +2,36 @@
 title: "Teil 5: Claude-Agenten & Cockpit"
 part: 5
 slug: "claude-agenten-cockpit"
-summary: "Wie aus einzelnen Claude-Code-Jobs ein System wird: ein append-only Event-Log als Wahrheitsquelle, eine schlanke FastAPI, Worktree-Isolation pro Agent – und zwei sehr unterschiedliche Cockpits, um alles zu beobachten und zu steuern."
+summary: "Wie aus einzelnen Claude-Code-Jobs ein System wird: ein Protokoll, das nie überschrieben wird, eine schlanke Steuer-Schnittstelle, eigene Arbeitskopien pro Agent – und zwei sehr unterschiedliche Cockpits, um alles zu beobachten und zu steuern."
 date: "2026-07-13"
 readingTime: "9 min"
 tags: ["Claude Code", "FastAPI", "Architektur", "TUI"]
 ---
 
-Ein einzelner Hintergrund-Job, wie in Teil 4 beschrieben, ist überschaubar. Sobald aber mehrere Agenten parallel an verschiedenen Aufgaben arbeiten, brauche ich etwas, das den Überblick behält: einen zentralen Zustand, eine API, über die ich Aktionen auslösen kann, und ein Cockpit, das mir zeigt, was gerade passiert. Das ist der Teil der Serie, in dem aus einzelnen Kommandos ein System wird.
+Ein einzelner Hintergrund-Job, wie in Teil 4 beschrieben, ist überschaubar. Sobald aber mehrere Agenten parallel an verschiedenen Aufgaben arbeiten, brauche ich etwas, das den Überblick behält: einen zentralen Zustand, eine Schnittstelle, über die ich Aktionen auslösen kann, und ein Cockpit, das mir zeigt, was gerade passiert. Das ist der Teil der Serie, in dem aus einzelnen Befehlen ein System wird.
 
-## Ein Event-Log als einzige Wahrheitsquelle
+## Ein Protokoll als einzige Wahrheitsquelle
 
-Das Fundament ist bewusst simpel gehalten: ein append-only Event-Log. Jede Zustandsänderung – ein Job startet, ein Run wird gemerged, ein Budget läuft aus – wird als Event angehängt, nie verändert oder gelöscht. In meinem Code sind die Bausteine sauber getrennt: `events.py` führt das eigentliche Log, `projection.py` faltet die Events zu einem aktuellen Zustand zusammen (Fold), `triage.py` filtert daraus das heraus, was gerade wirklich meine Aufmerksamkeit braucht, und `model.py` definiert die Kernobjekte – allen voran `Run` und `Balance`.
+Das Fundament ist bewusst einfach gehalten: ein Protokoll, an das nur angehängt, aber nie etwas gelöscht oder verändert wird ("append-only"). Jede Zustandsänderung – ein Job startet, ein Ergebnis wird übernommen, ein Budget läuft aus – wird als Eintrag angehängt, nie verändert oder gelöscht. In meinem Code sind die Bausteine sauber getrennt: `events.py` führt das eigentliche Protokoll, `projection.py` fasst die Einträge zu einem aktuellen Gesamtzustand zusammen, `triage.py` filtert daraus das heraus, was gerade wirklich meine Aufmerksamkeit braucht, und `model.py` definiert die Kernbegriffe – allen voran "Run" (ein einzelner Agentenlauf) und "Balance" (der aktuelle Kontostand des Budgets).
 
-Der Vorteil eines append-only Logs: Ich kann jederzeit rekonstruieren, wie ein Zustand entstanden ist, indem ich einfach von vorne durch die Events falte. Es gibt keinen separaten "aktuellen Zustand", der aus dem Ruder laufen könnte – der Zustand ist immer nur die Projektion der bisherigen Events.
+Der Vorteil eines solchen Nur-Anhänge-Protokolls: Ich kann jederzeit nachvollziehen, wie ein Zustand entstanden ist, indem ich einfach von vorne durch alle Einträge gehe. Es gibt keinen separaten "aktuellen Zustand", der aus dem Ruder laufen könnte – der Zustand ist immer nur die Summe der bisherigen Einträge.
 
-## Die API: FastAPI auf 127.0.0.1:7430
+## Die Steuer-Schnittstelle: nur vom Rechner selbst aus erreichbar
 
-Darüber liegt eine schlanke FastAPI-Anwendung (`daemon/main.py`), die – wie schon in Teil 2 und 3 beschrieben – ausschließlich auf `127.0.0.1:7430` lauscht. Die Kernrouten sind bewusst schmal:
+Darüber liegt eine schlanke Steuer-Schnittstelle (eine sogenannte API – kurz für "Programmierschnittstelle", also eine Art fest definierte Speisekarte von Befehlen, die andere Programme nutzen können), gebaut mit dem Werkzeug FastAPI (`daemon/main.py`). Sie lauscht – wie schon in Teil 2 und 3 beschrieben – ausschließlich auf `127.0.0.1:7430`, also nur am Rechner selbst. Die wichtigsten Einträge auf dieser "Speisekarte" sind bewusst schmal gehalten:
 
-- `GET /healthz` – Lebenszeichen
-- `GET /runs` – alle Runs
-- `GET /runs/{id}` – ein einzelner Run
-- `GET /repos` – bekannte Repositories
+- `GET /healthz` – Lebenszeichen ("ist der Daemon überhaupt wach?")
+- `GET /runs` – alle Läufe anzeigen
+- `GET /runs/{id}` – einen einzelnen Lauf anzeigen
+- `GET /repos` – bekannte Projektordner anzeigen
 - `POST /spawn` – einen neuen Agentenlauf starten
-- `GET /events` / `POST /events` – das Event-Log lesen bzw. schreiben
+- `GET /events` / `POST /events` – das Protokoll lesen bzw. beschreiben
 
-## Action-Routen, die tatsächlich existieren
+## Steuerbefehle, die tatsächlich existieren
 
-Neben dem reinen Lesen gibt es in `daemon/routes/runs.py` eine Reihe von Action-Routen, die echte Eingriffe erlauben:
+Neben dem reinen Anzeigen gibt es in `daemon/routes/runs.py` eine Reihe von Steuerbefehlen, die echte Eingriffe erlauben:
 
-```bash title="Beispiele für Action-Routen"
+```bash title="Beispiele für Steuerbefehle"
 POST /runs/{id}/merge
 POST /runs/{id}/discard
 POST /runs/{id}/redispatch
@@ -39,40 +39,40 @@ POST /runs/{id}/gc
 POST /runs/{id}/respond
 ```
 
-Jede dieser Routen tut im Kern dasselbe Muster: Sie emittiert ein `*_requested`-Event ins Log und ruft die passende `watcher.handle_*`-Funktion auf, die die eigentliche Arbeit erledigt – einen Branch mergen, einen Run verwerfen, einen fehlgeschlagenen Lauf neu starten, aufräumen, oder eine Rückfrage des Agenten beantworten.
+Jeder dieser Befehle tut im Kern dasselbe: Er hängt einen "angefordert"-Eintrag ans Protokoll an und ruft die passende Funktion in meinem Überwachungsprogramm auf, die die eigentliche Arbeit erledigt – eine Änderung übernehmen, einen Lauf verwerfen, einen fehlgeschlagenen Lauf neu starten, aufräumen, oder eine Rückfrage des Agenten beantworten.
 
 <Callout type="tip">
-Code schlägt Docs: In meiner eigenen `API.md` (Stand 2026-06-29) steht noch, dass genau diese Action-Routen und die `since_seq`-Query fehlen würden. Beides existiert im aktuellen Code längst. Für diese Serie habe ich mich an den Code gehalten, nicht an die (veraltete) Dokumentation – ein gutes Beispiel dafür, warum man bei sowas immer nachsieht statt sich auf die Doku zu verlassen.
+Der Code ist manchmal weiter als die Anleitung dazu: In meiner eigenen Doku-Datei `API.md` (Stand 2026-06-29) steht noch, dass genau diese Steuerbefehle fehlen würden. Beides existiert im aktuellen Code längst. Für diese Serie habe ich mich an den tatsächlichen Code gehalten, nicht an die veraltete Anleitung – ein gutes Beispiel dafür, warum man im Zweifel immer nachsieht, statt sich blind auf eine Doku zu verlassen.
 </Callout>
 
-## Wie Clients neue Events bekommen
+## Wie andere Programme von neuen Ereignissen erfahren
 
-Es gibt kein Server-Sent-Events- oder Websocket-Protokoll in diesem System – bewusst nicht. Stattdessen fragen Clients regelmäßig nach: `GET /events?since=<timestamp>` oder `GET /events?since_seq=<int>`. Beide Cockpits, die ich gleich vorstelle, pollen auf diese Weise in einem Rhythmus von ein bis zwei Sekunden. Das ist weniger elegant als ein Push-Mechanismus, aber deutlich einfacher zu debuggen und robuster gegenüber Verbindungsabbrüchen über Tailscale-Tunnel.
+Es gibt in diesem System bewusst keinen Mechanismus, bei dem der Server selbst aktiv Nachrichten verschickt, sobald etwas passiert. Stattdessen fragen die anzeigenden Programme (die "Clients") regelmäßig selbst nach: `GET /events?since=<zeitpunkt>` oder `GET /events?since_seq=<zahl>`. Beide Cockpits, die ich gleich vorstelle, fragen auf diese Weise im Rhythmus von ein bis zwei Sekunden nach. Das ist weniger elegant, als wenn der Server selbst aktiv Bescheid geben würde, aber deutlich einfacher zu debuggen (also Fehler zu finden) und robuster gegenüber Verbindungsabbrüchen über den Tailscale-Tunnel.
 
-## Worktree-Isolation pro Agent
+## Eine eigene Arbeitskopie pro Agent
 
-Damit mehrere Agenten nicht gegenseitig ihre Änderungen überschreiben, bekommt jeder Lauf ein eigenes Git-Worktree:
+Damit mehrere Agenten sich nicht gegenseitig die Änderungen überschreiben, bekommt jeder Lauf eine eigene, komplett unabhängige Kopie des Projektordners – ein sogenanntes Git-Worktree (eine parallele, aber saubere Arbeitskopie desselben Projekts, damit niemand sich gegenseitig ins Gehege kommt):
 
-```bash title="Worktree pro Agent"
+```bash title="Arbeitskopie pro Agent anlegen"
 git worktree add -b agent/<slug> .worktrees/<branch> <base>
 ```
 
-Der `<slug>` wird aus dem Aufgabennamen abgeleitet (slugifiziert), und bei Namenskollisionen hängt mein Code automatisch einen Suffix an. Eine Funktion namens `_validate_ref_name` prüft vorher, dass der resultierende Branch-Name ein gültiger Git-Ref ist. Welche Repositories dafür überhaupt zur Verfügung stehen, steht in einer zentralen `config/registry.yaml`.
+Der `<slug>` (ein Kurzname ohne Sonderzeichen) wird aus dem Namen der Aufgabe abgeleitet, und bei Namenskollisionen hängt mein Code automatisch eine Zusatzendung an. Eine Funktion namens `_validate_ref_name` prüft vorher, dass der entstehende Name als Git-Verweis gültig ist. Welche Projektordner dafür überhaupt zur Verfügung stehen, steht in einer zentralen Konfigurationsdatei namens `config/registry.yaml`.
 
 ## Zwei Cockpits, zwei Philosophien
 
 Um das alles zu beobachten und zu steuern, habe ich zwei komplett unterschiedliche Cockpits gebaut.
 
-Das erste ist eine Textual-TUI – ein Terminal-Interface mit echten Aktionen. Installiert wird es klassisch:
+Das erste ist eine Textual-TUI – eine Bedienoberfläche direkt im Terminal-Fenster (also textbasiert, ohne Maus und Grafik, aber mit echten Aktionen). Installiert wird sie klassisch mit zwei Befehlen – der erste richtet das Programm ein, der zweite startet es:
 
 ```bash title="TUI installieren und starten"
 pip install -e .
 agent-tui
 ```
 
-Das Entry-Point ist in meiner `pyproject.toml` als `agent-tui = "tui.app:main"` eingetragen. Im Hintergrund pollt ein Modul namens `tui/poller.py` alle zwei Sekunden `GET /runs`. Die Bedienung läuft über einzelne Tasten: `m` für merge, `d` für discard, `r` für redispatch, `g` für gc, `a` um alle anzuzeigen, `q` zum Beenden.
+Der Startpunkt ist in meiner Projekt-Konfiguration (`pyproject.toml`) als `agent-tui = "tui.app:main"` eingetragen. Im Hintergrund fragt ein Baustein namens `tui/poller.py` alle zwei Sekunden `GET /runs` ab. Die Bedienung läuft über einzelne Tasten: `m` für Übernehmen (merge), `d` für Verwerfen (discard), `r` für Neustarten (redispatch), `g` für Aufräumen (gc), `a` um alle anzuzeigen, `q` zum Beenden.
 
-Für den Fernzugriff gibt es einen Launcher (`bin/agent-cockpit`), den ich per SSH remote starte und in einer `tmux`-Session am Leben halte:
+Für den Fernzugriff gibt es einen Starter (`bin/agent-cockpit`), den ich per Fernzugriff (SSH) starte und in einer sogenannten `tmux`-Sitzung am Leben halte – `tmux` ist ein Werkzeug, das eine Terminal-Sitzung auch dann weiterlaufen lässt, wenn ich die Verbindung trenne, ähnlich einer Pause-Taste, die das Programm einfach im Hintergrund weiterlaufen lässt:
 
 ```bash title="TUI remote starten"
 ssh -t uli@nuc "~/agent-daemon/bin/agent-cockpit"
@@ -80,12 +80,12 @@ ssh -t uli@nuc "~/agent-daemon/bin/agent-cockpit"
 
 Läuft die Sitzung einmal in `tmux`, kann ich sie mit `tmux attach -t agent-tui` jederzeit wieder aufnehmen, egal von welchem Gerät aus ich mich einwähle.
 
-Das zweite Cockpit ist eine Flutter-App namens `agent_cockpit` – aber mit einer ganz anderen Rolle. Sie ist bewusst ein reiner Leser, ohne eigenen Zustand. Sie pollt `GET /events` alle 1500 Millisekunden und zeigt an, was passiert, kann aber nichts auslösen. Das ist keine Einschränkung aus Zeitmangel, sondern Absicht: In `http_actuation_channel.dart` wirft jede Aktionsmethode bewusst einen `UnimplementedError`. Die App ist read-only, mit voller Absicht – ich wollte ein Gerät haben, auf dem ich schnell mal reinschauen kann, ohne die Gefahr, versehentlich vom Handy aus einen Run zu mergen oder zu verwerfen.
+Das zweite Cockpit ist eine Handy-App namens `agent_cockpit`, gebaut mit dem Werkzeug Flutter – aber mit einer ganz anderen Rolle. Sie ist bewusst ein reiner Betrachter, ohne eigenen Zustand. Sie fragt `GET /events` alle 1500 Millisekunden ab und zeigt an, was passiert, kann aber nichts auslösen. Das ist keine Einschränkung aus Zeitmangel, sondern Absicht: In einer Datei namens `http_actuation_channel.dart` wirft jede Aktionsmethode bewusst einen Fehler und tut nichts. Die App ist reines Lesen, mit voller Absicht – ich wollte ein Gerät haben, auf dem ich schnell mal reinschauen kann, ohne die Gefahr, versehentlich vom Handy aus einen Lauf zu übernehmen oder zu verwerfen.
 
 ## Zwei Werkzeuge für zwei Situationen
 
-Am Schreibtisch, mit Tastatur und Terminal, nutze ich die Textual-TUI – dort will ich aktiv eingreifen können. Unterwegs, auf dem Handy, reicht mir der reine Lesezugriff der Flutter-App völlig, und die fehlende Aktionsmöglichkeit fühlt sich eher wie ein Sicherheitsnetz an als wie eine Einschränkung.
+Am Schreibtisch, mit Tastatur, nutze ich die Textual-TUI – dort will ich aktiv eingreifen können. Unterwegs, auf dem Handy, reicht mir der reine Lesezugriff der Flutter-App völlig, und die fehlende Aktionsmöglichkeit fühlt sich eher wie ein Sicherheitsnetz an als wie eine Einschränkung.
 
 ## Ausblick
 
-Damit steht das komplette Orchestrierungs-System: Event-Log, API, Worktree-Isolation, zwei Cockpits. Was bisher fehlt, ist der Teil, für den ich das alles ursprünglich gebaut habe – Bildgenerierung auf einer echten GPU. In Teil 6 zeige ich, wie ich ComfyUI auf der separaten 3090-Maschine von Claude aus ansteuere, inklusive einem Bug, der mich fast eine ganze Nacht gekostet hat: CUDA, das nach einem Suspend tot ist, obwohl alle Health-Checks grün leuchten.
+Damit steht das komplette Steuerungssystem: Protokoll, Schnittstelle, eigene Arbeitskopien, zwei Cockpits. Was bisher fehlt, ist der Teil, für den ich das alles ursprünglich gebaut habe – Bildgenerierung auf einer echten Grafikkarte. In Teil 6 zeige ich, wie ich ComfyUI (ein Werkzeug zur Bildgenerierung) auf der separaten 3090-Maschine von Claude aus ansteuere, inklusive einem Fehler, der mich fast eine ganze Nacht gekostet hat: eine Grafikkarte, die nach dem Aufwachen aus dem Schlafmodus technisch tot ist, obwohl alle Gesundheitschecks grün leuchten.
