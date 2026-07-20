@@ -2,41 +2,41 @@
 title: "Teil 2: Der NUC als Fundament"
 part: 2
 slug: "nuc-fundament"
-summary: "Wie ich einen unscheinbaren Intel NUC zum always-on Relay meines Setups gemacht habe – Hostname, Systemd-Service für den Daemon und ein kleines Wake-Tool, alles ohne eigene GPU-Last."
+summary: "Wie ich einen unscheinbaren kleinen Rechner zum rund um die Uhr laufenden Fundament meines Setups gemacht habe – mit eigenem Namen, einem Dienst, der Abstürze wegsteckt, und einem kleinen Werkzeug zum Aufwecken der GPU."
 date: "2026-07-13"
 readingTime: "7 min"
 tags: ["Homelab", "Linux", "systemd", "NUC"]
 ---
 
-Bevor irgendein Agent irgendetwas tut, braucht es eine Maschine, die einfach immer läuft. Keine Grafikkarte, keine besondere Leistung – nur Verlässlichkeit. Bei mir übernimmt das ein alter Intel NUC5i5RYB. Kein Tippfehler: der hat keine eigene dedizierte GPU. Das ist auch genau der Punkt. Dieser Rechner soll nichts rechnen, was Grafikleistung braucht – dafür gibt es später eine separate Maschine mit einer RTX 3090 (Teil 6). Der NUC ist der Concierge, nicht der Arbeiter.
+Bevor irgendein KI-Agent irgendetwas tut, braucht es eine Maschine, die einfach immer läuft. Keine Grafikkarte, keine besondere Leistung – nur Verlässlichkeit. Bei mir übernimmt das ein alter Intel NUC5i5RYB. Ein NUC ("Next Unit of Computing") ist im Grunde ein winziger, stromsparender Komplett-Rechner, kaum größer als ein dickes Buch. Meiner hat keine eigene, leistungsstarke Grafikkarte – und das ist auch genau der Punkt. Dieser Rechner soll nichts erledigen, was starke Grafikleistung braucht. Dafür gibt es später eine separate Maschine mit einer RTX 3090 (Teil 6). Der NUC ist der Concierge am Empfang, nicht der Arbeiter in der Werkstatt.
 
-## Warum überhaupt ein NUC
+## Warum überhaupt so ein kleiner Rechner
 
-Ich wollte eine Maschine, die 24/7 läuft, wenig Strom zieht und trotzdem genug Rechenleistung hat, um einen kleinen FastAPI-Daemon, SSH-Zugänge und ein bisschen Orchestrierung zu stemmen. Ein Intel NUC ist dafür fast schon die klassische Wahl: klein, leise, günstig im Betrieb. Er macht selbst nie GPU-Arbeit – wenn ein Agent Bilder generieren oder ein Modell trainieren soll, wird das an die GPU-Box im selben LAN delegiert. Der NUC bleibt der always-on-Relay, der alles am Laufen hält, während die GPU-Maschine nur bei Bedarf aufwacht.
+Ich wollte eine Maschine, die rund um die Uhr läuft, wenig Strom zieht und trotzdem genug Leistung hat, um ein kleines Hintergrundprogramm (einen "Daemon"), Fernzugriffe und ein bisschen Organisation zu stemmen. So ein NUC ist dafür fast die klassische Wahl: klein, leise, günstig im Betrieb. Er macht selbst nie Grafikarbeit – wenn ein Agent Bilder erzeugen oder ein Modell trainieren soll, wird das an die GPU-Maschine im selben Netzwerk weitergegeben. Der NUC bleibt das rund um die Uhr laufende Bindeglied, das alles am Laufen hält, während die GPU-Maschine nur bei Bedarf aufwacht.
 
-## Erste Schritte: Hostname und /etc/hosts
+## Erste Schritte: dem Rechner einen Namen geben
 
-Der erste handfeste Schritt war, dem Rechner einen Namen zu geben, der in der ganzen Serie wiederkehrt: `nuc`.
+Der erste handfeste Schritt war, dem Rechner einen Namen zu geben, der in der ganzen Serie wiederkehrt: `nuc`. Mit diesem Befehl sage ich dem Rechner, dass er ab jetzt auf genau diesen Namen hört:
 
 ```bash title="Hostname setzen"
 sudo hostnamectl set-hostname nuc
 ```
 
-Danach musste ich noch den Eintrag in `/etc/hosts` nachziehen, weil der ursprüngliche Eintrag noch den alten Nutzer-basierten Hostnamen enthielt:
+Danach musste ich noch eine zweite, interne Namensliste des Rechners (die Datei `/etc/hosts`) anpassen, weil dort noch der alte, auf meinen Nutzernamen basierende Name eingetragen war. Mit diesem Befehl ersetze ich den alten Eintrag durch den neuen:
 
 ```bash title="/etc/hosts anpassen"
 sudo sed -i 's/uli\.nuc uli/nuc.nuc nuc/' /etc/hosts
 ```
 
-Klein, aber wichtig: Ohne diesen Zweizeiler hätte ich später ständig Verwirrung zwischen dem lokalen Hostnamen und dem Namen gehabt, unter dem die Maschine im Tailscale-Netz (Teil 3) erreichbar ist.
+Klein, aber wichtig: Ohne diese zwei Zeilen hätte ich später ständig Verwirrung zwischen dem lokalen Namen des Rechners und dem Namen gehabt, unter dem die Maschine im Tailscale-Netz (Teil 3, mein privates Netzwerk zwischen allen Geräten) erreichbar ist.
 
 <Callout type="warn">
-In automatisierten Sessions – etwa wenn ein Agent selbst am NUC arbeitet – steht kein `sudo` zur Verfügung. Alle privilegierten Schritte wie die beiden oben mache ich als Mensch selbst, per Hand, am Gerät oder per SSH mit meinem eigenen Passwort. Kein Agent bekommt Root.
+Wichtig: In automatisierten Sitzungen – etwa wenn ein Agent selbst am NUC arbeitet – hat dieser keine Rechte für Befehle, die mit `sudo` beginnen (das sind Befehle, die besondere, weitreichende Rechte am System brauchen, vergleichbar mit einem Generalschlüssel). Solche Schritte mache immer ich selbst von Hand, direkt am Gerät oder per Fernzugriff mit meinem eigenen Passwort. Kein Agent bekommt diesen Generalschlüssel.
 </Callout>
 
-## Der Daemon als systemd-Service
+## Der Daemon als Dienst, der Abstürze übersteht
 
-Das Herzstück auf dem NUC ist ein kleiner Python-Daemon, der Claude-Agenten startet, überwacht und ihren Zustand verwaltet (mehr dazu in Teil 4 und 5). Damit er einen Neustart des NUC übersteht und sich selbst wieder hochzieht, läuft er als systemd-Unit:
+Das Herzstück auf dem NUC ist ein kleines Hintergrundprogramm (geschrieben in Python), das Claude-Agenten startet, überwacht und ihren Zustand verwaltet (mehr dazu in Teil 4 und 5). Damit es einen Neustart des NUC übersteht und sich danach von selbst wieder hochzieht, richte ich es als sogenannten systemd-Dienst ein. Systemd ist die Verwaltungsschicht von Linux, die dafür sorgt, dass wichtige Programme automatisch starten und im Fehlerfall neu gestartet werden – ähnlich einem Hausmeister, der nach jedem Stromausfall selbstständig alle Geräte wieder einschaltet. Diese Datei beschreibt dem Hausmeister genau, wie er meinen Daemon behandeln soll:
 
 ```ini title="/etc/systemd/system/agent-daemon.service"
 [Unit]
@@ -52,31 +52,31 @@ User=uli
 WantedBy=multi-user.target
 ```
 
-Zwei Details hier sind kein Zufall. Erstens: `--host 127.0.0.1` – der Daemon bindet nur an Loopback, nie an `0.0.0.0`. Das ist dieselbe Netzwerk-Posture, die ich in Teil 1 schon angesprochen habe, und sie zieht sich durch die gesamte Serie. Zweitens: `Restart=always` – stürzt der Prozess ab, holt systemd ihn zurück, ohne dass ich eingreifen muss.
+Zwei Details hier sind kein Zufall. Erstens: `--host 127.0.0.1` – der Daemon ist nur vom Rechner selbst aus erreichbar, niemals von außen. Das ist dieselbe Netzwerk-Regel, die ich in Teil 1 schon angesprochen habe, und sie zieht sich durch die gesamte Serie. Zweitens: `Restart=always` – stürzt das Programm ab, holt der Hausmeister es automatisch zurück, ohne dass ich eingreifen muss.
 
-Installiert wird die Unit-Datei mit den üblichen zwei Handgriffen:
+Diese Beschreibung wird mit zwei Befehlen scharf geschaltet – der erste kopiert die Datei an den richtigen Ort, der zweite aktiviert und startet den Dienst sofort:
 
 ```bash title="Service installieren und starten"
 sudo cp agent-daemon.service /etc/systemd/system/
 sudo systemctl enable --now agent-daemon
 ```
 
-`enable --now` sorgt dafür, dass der Service sofort startet und beim nächsten Boot automatisch wieder hochkommt. Von diesem Moment an läuft der Daemon dauerhaft im Hintergrund, ohne dass ich ihn manuell starten oder überwachen muss.
+`enable --now` sorgt dafür, dass der Dienst sofort startet und beim nächsten Neustart automatisch wieder hochkommt. Von diesem Moment an läuft der Daemon dauerhaft im Hintergrund, ohne dass ich ihn manuell starten oder überwachen muss.
 
 ## Ein kleines Werkzeug: wakegpu
 
-Weil die GPU-Box nicht durchläuft, sondern erst bei Bedarf geweckt wird (mehr dazu in Teil 6 und 7), braucht der NUC ein Werkzeug, das dieses Aufwecken anstößt. Bei mir ist das ein kleines Binary namens `wakegpu`, das ich systemweit verfügbar gemacht habe:
+Weil die GPU-Maschine nicht durchläuft, sondern erst bei Bedarf geweckt wird (mehr dazu in Teil 6 und 7), braucht der NUC ein Werkzeug, das dieses Aufwecken anstößt. Bei mir ist das ein kleines Programm namens `wakegpu`, das ich systemweit verfügbar gemacht habe. Mit diesem Befehl lege ich es an eine Stelle, von der aus es der Rechner von überall aufrufen kann:
 
 ```bash title="wakegpu installieren"
 sudo install -m 0755 wakegpu /usr/local/bin/wakegpu
 ```
 
-`install -m 0755` kopiert die Datei und setzt gleichzeitig die richtigen Rechte – ausführbar für alle, schreibbar nur für den Besitzer. Damit kann ich später von überall im Netz aus `wakegpu` aufrufen, ohne mir Gedanken über Pfade oder Berechtigungen machen zu müssen. Wie genau das Wecken über Tailscale und ein Magic Packet funktioniert, zeige ich in Teil 7.
+`install -m 0755` kopiert die Datei und setzt gleichzeitig die richtigen Zugriffsrechte – ausführbar für alle, veränderbar nur für mich als Besitzer. Damit kann ich später von überall im Netz aus `wakegpu` aufrufen, ohne mir Gedanken über Speicherorte oder Berechtigungen machen zu müssen. Wie genau das Wecken über Tailscale und ein sogenanntes Magic Packet (ein spezielles Weck-Signal fürs Netzwerk) funktioniert, zeige ich in Teil 7.
 
 <Callout type="info">
-Zur Hardware selbst: Es handelt sich um einen Intel NUC5i5RYB ohne eigene dedizierte Grafikeinheit – das habe ich vor der Veröffentlichung extra gegen meine Hardware-Unterlagen geprüft, weil es in keinem der Repos dokumentiert war. Genau deshalb läuft jede GPU-Last auf der separaten 3090-Maschine, nie auf diesem Rechner.
+Zur Hardware selbst: Es handelt sich um einen Intel NUC5i5RYB ohne eigene, leistungsstarke Grafikeinheit – das habe ich vor der Veröffentlichung extra noch einmal an meiner Hardware geprüft, weil es in keiner meiner Notizen dokumentiert war. Genau deshalb läuft jede Grafik-Rechenlast auf der separaten 3090-Maschine, nie auf diesem Rechner.
 </Callout>
 
 ## Was jetzt schon steht
 
-Mit Hostname, systemd-Service und `wakegpu` hat der NUC alles, was er braucht, um als Fundament zu funktionieren: Er ist eindeutig benennbar, sein wichtigster Prozess übersteht Neustarts und Abstürze automatisch, und er hat ein Werkzeug, um die GPU-Maschine bei Bedarf aus dem Schlaf zu holen. Was noch fehlt, ist der Weg, wie ich von meinem Laptop oder Handy überhaupt an diesen NUC herankomme, ohne einen Port ins offene Internet zu hängen. Genau darum geht es in Teil 3: Tailscale als privates Netz zwischen allen meinen Geräten.
+Mit eigenem Namen, einem Dienst, der Neustarts und Abstürze automatisch wegsteckt, und dem `wakegpu`-Werkzeug hat der NUC alles, was er als Fundament braucht: Er ist eindeutig ansprechbar, sein wichtigstes Programm übersteht Neustarts und Abstürze von selbst, und er kann die GPU-Maschine bei Bedarf aus dem Schlaf holen. Was noch fehlt, ist der Weg, wie ich von meinem Laptop oder Handy überhaupt an diesen NUC herankomme, ohne eine Tür ins offene Internet aufzureißen. Genau darum geht es in Teil 3: Tailscale als privates Netz zwischen all meinen Geräten.
