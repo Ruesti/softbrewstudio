@@ -2,39 +2,39 @@
 title: "Teil 4: Claude headless auf dem NUC"
 part: 4
 slug: "claude-headless-nuc"
-summary: "Wie ich Claude Code als Hintergrundprozess auf dem NUC spawne, seinen Lebenszyklus über die CLI steuere – und wie ein Zählfehler bei Cache-Tokens mein Budget beinahe verfünffacht hätte."
+summary: "Wie ich Claude Code unsichtbar im Hintergrund auf dem NUC laufen lasse, seinen Lebenszyklus über einfache Befehle steuere – und wie ein Zählfehler mein Budget beinahe verfünffacht hätte."
 date: "2026-07-13"
 readingTime: "8 min"
 tags: ["Claude Code", "Automation", "Python", "Homelab"]
 ---
 
-Jetzt wird es interessant. NUC und Tailscale stehen, aber bisher ist das nur Infrastruktur ohne Inhalt. In diesem Teil geht es darum, wie ich Claude Code tatsächlich als Hintergrundprozess auf dem NUC laufen lasse – ohne dass ich ein Terminal offen halten muss, und mit einer Überwachung, die genau weiß, wie viele Tokens gerade verbraucht werden.
+Jetzt wird es interessant. NUC und Tailscale stehen, aber bisher ist das nur Infrastruktur ohne Inhalt. In diesem Teil geht es darum, wie ich Claude Code – das KI-Werkzeug, das für mich Programmieraufgaben erledigt – tatsächlich als Hintergrundprozess auf dem NUC laufen lasse. Ohne dass ich ein Fenster offen halten muss, und mit einer Überwachung, die genau weiß, wie viele Textbausteine ("Tokens") gerade verbraucht werden.
 
-## Ein Agent wird gespawnt
+## Ein Agent wird gestartet
 
-Der Kern ist ein Python-Modul in meinem Daemon, das ich `spawn.py` genannt habe. Es baut die argv-Liste für den Claude-Code-Aufruf zusammen und startet ihn im Hintergrund:
+Man nennt das Starten eines solchen Hintergrundprozesses auch "spawnen" (von englisch "to spawn" – hervorbringen, erzeugen). Der Kern dafür ist ein kleines Python-Programm in meinem Daemon, das ich `spawn.py` genannt habe. Es stellt die Befehlszeile für den Aufruf von Claude Code zusammen und startet ihn im Hintergrund. So sieht die Grundform dieses Aufrufs aus:
 
 ```bash title="Grundform des Spawn-Aufrufs"
 claude --bg --name <run_id> --permission-mode <mode> <prompt>
 ```
 
-`--bg` sorgt dafür, dass Claude Code sich selbst in den Hintergrund schickt, statt das Terminal zu blockieren. `--name` gibt dem Lauf eine eindeutige ID, unter der ich ihn später wiederfinde. Und `--permission-mode` legt fest, wie viel der Agent ohne Rückfrage tun darf – dieser Wert kommt bei mir standardmäßig aus der Konfiguration (`watcher.permission_mode: auto` in derselben `pricing.yaml`, die ich schon in Teil 1 erwähnt habe).
+`--bg` sorgt dafür, dass Claude Code sich selbst in den Hintergrund schickt, statt das Fenster zu blockieren ("bg" wie "background"). `--name` gibt dem Lauf eine eindeutige Kennung, unter der ich ihn später wiederfinde. Und `--permission-mode` legt fest, wie viel der Agent ohne Rückfrage tun darf – dieser Wert kommt bei mir standardmäßig aus einer Konfigurationsdatei (`watcher.permission_mode: auto`, in derselben `pricing.yaml`, die ich schon in Teil 1 erwähnt habe).
 
-Ein echtes Beispiel aus der Praxis, so wie ich es tatsächlich abgeschickt habe:
+Ein echtes Beispiel aus der Praxis, so wie ich es tatsächlich losgeschickt habe:
 
 ```bash title="Ein realer Spawn-Aufruf"
 claude --bg --name verbrauch --permission-mode acceptEdits "…"
 ```
 
-`acceptEdits` heißt: Der Agent darf Dateien bearbeiten, ohne bei jeder einzelnen Änderung nachzufragen – praktisch für längere, unbeaufsichtigte Läufe, aber eben auch ein Grund, warum das Budget-Tracking aus diesem Artikel so wichtig ist.
+`acceptEdits` heißt: Der Agent darf Dateien bearbeiten, ohne bei jeder einzelnen Änderung nachzufragen – praktisch für längere, unbeaufsichtigte Läufe, aber eben auch ein Grund, warum die Budget-Überwachung aus diesem Artikel so wichtig ist.
 
-## Die Job-ID aus der Ausgabe fischen
+## Die Auftrags-Kennung aus der Ausgabe herausfischen
 
-Wenn Claude Code im Hintergrund startet, gibt es auf stdout eine Zeile aus, die unter anderem eine achtstellige Hex-ID enthält. Mein Daemon parst diese ID mit einer simplen Regel: acht Hex-Zeichen nach dem Wort "backgrounded" im Ausgabetext, per regulärem Ausdruck `([0-9a-f]{8})`. Diese ID ist ab dann der Schlüssel, mit dem ich den Lauf im gesamten System wiederfinde – im Daemon, im Cockpit (Teil 5), überall.
+Wenn Claude Code im Hintergrund startet, gibt es eine Textzeile aus, die unter anderem eine achtstellige Kennung enthält. Mein Daemon liest diese Kennung mit einer einfachen Regel heraus: acht bestimmte Zeichen nach dem Wort "backgrounded" im Ausgabetext, gefunden über ein sogenanntes Muster-Suchverfahren (`([0-9a-f]{8})`). Diese Kennung ist ab dann der Schlüssel, mit dem ich den Lauf im gesamten System wiederfinde – im Daemon, im Cockpit (Teil 5), überall.
 
-## Lebenszyklus über die CLI
+## Den Lauf über einfache Befehle steuern
 
-Ist der Job einmal gestartet, steuere ich seinen weiteren Lebenszyklus komplett über die Claude-Code-CLI selbst:
+Ist der Auftrag einmal gestartet, steuere ich seinen weiteren Lebensweg komplett über die eingebauten Befehle von Claude Code selbst:
 
 ```bash title="Laufende Jobs auflisten"
 claude agents --json --all
@@ -52,28 +52,28 @@ claude rm <job_id>
 claude attach <job_id>
 ```
 
-Das ist bewusst schmal gehalten: kein eigenes Protokoll, keine Extra-Abstraktion – ich nutze das, was die CLI selbst mitbringt, und baue meinen Daemon als dünne Schicht darüber.
+Das ist bewusst schmal gehalten: kein eigenes, zusätzliches Regelwerk – ich nutze das, was Claude Code selbst schon mitbringt, und baue meinen Daemon nur als dünne Schicht darüber.
 
 ## Wo der Zustand wirklich liegt
 
-Jeder Job legt unter `~/.claude/jobs/<id>/state.json` eine Zustandsdatei an. Aber – und das ist der Teil, der mich am meisten überrascht hat, als ich anfing, den Verbrauch live zu verfolgen – die aktuellen Token-Zahlen stehen dort nicht drin. Die `state.json` sagt mir, ob ein Job läuft, beendet ist oder fehlgeschlagen ist, aber nichts über den laufenden Verbrauch.
+Jeder Job legt in einer eigenen Datei (`~/.claude/jobs/<id>/state.json`) einen Zustand ab. Aber – und das ist der Teil, der mich am meisten überrascht hat, als ich anfing, den Verbrauch live zu verfolgen – die aktuellen Zahlen zum Textbaustein-Verbrauch stehen dort nicht drin. Diese Datei sagt mir nur, ob ein Job läuft, beendet ist oder fehlgeschlagen ist, aber nichts über den laufenden Verbrauch.
 
-Die eigentlichen Nutzungsdaten holt sich mein Daemon aus einer ganz anderen Quelle: dem Transcript der Session, das unter `~/.claude/projects/<slug>/<sessionId>.jsonl` liegt. Eine Funktion namens `_process_transcript` liest diese Datei inkrementell – Zeile für Zeile, immer nur die neuen Einträge seit dem letzten Durchlauf – und extrahiert daraus die Token-Zahlen für Input, Output und Cache.
+Die eigentlichen Nutzungsdaten holt sich mein Daemon aus einer ganz anderen Quelle: dem vollständigen Gesprächsprotokoll der Sitzung, das in einer Datei unter `~/.claude/projects/<slug>/<sessionId>.jsonl` liegt. Eine Funktion namens `_process_transcript` liest diese Datei fortlaufend – Zeile für Zeile, immer nur die neuen Einträge seit dem letzten Durchlauf – und liest daraus die Zahlen für eingehende, ausgehende und zwischengespeicherte Textbausteine heraus.
 
-## Die Lektion mit den Cache-Tokens
+## Die Lektion mit den zwischengespeicherten Textbausteinen
 
-Und hier kommt die Geschichte, die mich am meisten gelehrt hat. In der ersten Version meiner Budget-Berechnung habe ich schlicht alle vier Token-Kategorien aus dem Transcript aufsummiert: Input, Output, Cache-Write und Cache-Read. Klang nach der naheliegendsten, korrektesten Lösung.
+Und hier kommt die Geschichte, die mich am meisten gelehrt hat. In der ersten Version meiner Budget-Berechnung habe ich schlicht alle vier Kategorien von Textbausteinen aus dem Protokoll zusammengezählt: eingehend, ausgehend, neu zwischengespeichert und aus dem Zwischenspeicher gelesen. Klang nach der naheliegendsten, korrektesten Lösung.
 
-Das Problem: `cache_read` zählt bei jeder einzelnen Gesprächsrunde den kompletten bisherigen Kontext neu mit – und der kann bei einem längeren Agentenlauf schnell über 100.000 Tokens groß sein. Jede Runde, egal wie klein die eigentliche Antwort war, hat also den gesamten aufgelaufenen Kontext noch einmal ins Budget eingerechnet. Das Ergebnis: Ein Budget, das eigentlich bei 40.000 Tokens gedeckelt war, lief in der Praxis auf 199.799 Tokens hoch, bevor irgendetwas gestoppt hat.
+Das Problem: Die Kategorie "aus dem Zwischenspeicher gelesen" zählt bei jeder einzelnen Gesprächsrunde den kompletten bisherigen Gesprächsverlauf neu mit – und der kann bei einem längeren Agentenlauf schnell über 100.000 Textbausteine groß sein. Jede Runde, egal wie klein die eigentliche Antwort war, hat also den gesamten bisher aufgelaufenen Verlauf noch einmal ins Budget eingerechnet. Das Ergebnis: Ein Budget, das eigentlich bei 40.000 Textbausteinen gedeckelt war, lief in der Praxis auf 199.799 Textbausteine hoch, bevor irgendetwas gestoppt hat.
 
 <Callout type="warn">
-Lehrstück aus der Praxis: Meine erste Budget-Metrik summierte `input + output + cache_write + cache_read`. Weil `cache_read` bei jeder Runde den kompletten Kontext (oft 100.000+ Tokens) erneut mitzählt, lief ein eigentlich auf 40.000 Tokens gedeckeltes Budget auf 199.799 Tokens hoch, bevor der Stopp griff. Der Fix in Iteration 2: Die Budget-Berechnung (`_budget_tokens`) lässt `cache_read` jetzt außen vor. Die Kostenberechnung dagegen behält `cache_read` bewusst bei – denn auch wiederverwendeter Cache-Kontext kostet echtes Geld, auch wenn er fürs Budget nicht zählen soll.
+Lehrstück aus der Praxis: Meine erste Budget-Messung zählte einfach alle vier Kategorien zusammen. Weil die Kategorie "aus dem Zwischenspeicher gelesen" bei jeder Runde den kompletten Gesprächsverlauf (oft 100.000+ Textbausteine) erneut mitzählt, lief ein eigentlich auf 40.000 Textbausteine gedeckeltes Budget auf 199.799 Textbausteine hoch, bevor der Stopp griff. Der Fix: Die Budget-Berechnung (`_budget_tokens`) lässt diese Kategorie jetzt außen vor. Die Kostenberechnung dagegen behält sie bewusst bei – denn auch wiederverwendeter Gesprächsverlauf kostet echtes Geld, auch wenn er fürs Budget nicht zählen soll.
 </Callout>
 
-Der Unterschied zwischen Budget und Kosten ist also feiner, als er zunächst aussieht: Fürs Budget – die Frage "darf dieser Agent noch weiterlaufen?" – zählt nur, was tatsächlich neu verarbeitet wurde. Für die Kostenrechnung – "was hat dieser Lauf gekostet?" – zählt dagegen alles, inklusive wiederverwendetem Cache, weil auch der abgerechnet wird.
+Der Unterschied zwischen Budget und Kosten ist also feiner, als er zunächst aussieht: Fürs Budget – die Frage "darf dieser Agent noch weiterlaufen?" – zählt nur, was tatsächlich neu verarbeitet wurde. Für die Kostenrechnung – "was hat dieser Lauf gekostet?" – zählt dagegen alles, einschließlich wiederverwendetem Gesprächsverlauf, weil auch der abgerechnet wird.
 
-Seit diesem Fix funktioniert das erwartete Verhalten zuverlässig: Überschreitet ein Lauf sein Budget, meldet mein Watcher-Modul das als `budget_exceeded`, und `claude stop` beendet den Job tatsächlich. Kein stiller Fehlschlag, kein Job, der einfach munter weiterläuft, während im Hintergrund die Kosten steigen.
+Seit diesem Fix funktioniert das erwartete Verhalten zuverlässig: Überschreitet ein Lauf sein Budget, meldet mein Überwachungsprogramm das als `budget_exceeded`, und der Stopp-Befehl beendet den Job tatsächlich. Kein stiller Fehlschlag, kein Job, der einfach munter weiterläuft, während im Hintergrund die Kosten steigen.
 
 ## Ausblick
 
-Damit läuft Claude Code jetzt zuverlässig headless auf dem NUC, mit einer Budget-Kontrolle, die auf die harte Tour gelernt hat, korrekt zu zählen. Aber ein einzelner Job im Hintergrund ist erst der Anfang. In Teil 5 zeige ich, wie aus einzelnen Läufen ein ganzes System aus Events, Zuständen und einem Cockpit wird – inklusive Action-Routen, die im Code längst existieren, aber in einer veralteten Doku fehlen.
+Damit läuft Claude Code jetzt zuverlässig unsichtbar im Hintergrund auf dem NUC, mit einer Budget-Kontrolle, die auf die harte Tour gelernt hat, korrekt zu zählen. Aber ein einzelner Job im Hintergrund ist erst der Anfang. In Teil 5 zeige ich, wie aus einzelnen Läufen ein ganzes System aus Ereignissen, Zuständen und einem Cockpit wird – inklusive Steuerungsbefehlen, die im Code längst existieren, aber in einer veralteten Anleitung noch fehlen.
